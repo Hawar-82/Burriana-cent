@@ -1,0 +1,34 @@
+name: Backup Supabase CSV
+
+on:
+  schedule:
+    - cron: '0 6,18 * * *'  # Cada 12 horas (6:00 y 18:00 UTC)
+  workflow_dispatch:          # También permite ejecutarlo manualmente
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download ventas CSV from Supabase
+        run: |
+          mkdir -p backups
+          DATE=$(date +%Y-%m-%d_%H-%M)
+          curl -s \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Accept: text/csv" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/ventas?select=*&order=numero.asc" \
+            -o "backups/ventas_${DATE}.csv"
+          # Mantener solo los últimos 30 backups
+          ls -t backups/ventas_*.csv | tail -n +31 | xargs -r rm
+
+      - name: Commit and push backup
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add backups/
+          git diff --staged --quiet || git commit -m "Backup automático $(date +%Y-%m-%d\ %H:%M)"
+          git push
