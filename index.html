@@ -2840,6 +2840,21 @@ async function confirmImport(){
   const btn = document.getElementById('import-confirm');
   btn.disabled=true; btn.textContent='Importando…';
 
+  // Crear colaboradores nuevos automáticamente
+  const existingColabs = await getColaboradores();
+  const existingUsers = new Set(existingColabs.map(c => c.name.toLowerCase().trim()));
+  const newSellers = [...new Set(importData.map(e => e.seller).filter(s => s && !existingUsers.has(s.toLowerCase().trim())))];
+
+  for(const sellerName of newSellers){
+    const user = sellerName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'.');
+    const pass = 'rifa' + Math.floor(1000+Math.random()*9000);
+    await saveColaborador({ name: sellerName, user, pass, phone: '' });
+  }
+  if(newSellers.length > 0){
+    toast(`${newSellers.length} colaborador${newSellers.length!==1?'es':''} creado${newSellers.length!==1?'s':''}`, 'ok');
+  }
+
+  // Importar tickets
   let ok=0, fail=0;
   for(const entry of importData){
     try{
@@ -2853,8 +2868,7 @@ async function confirmImport(){
       });
       ok++;
     } catch(e){ fail++; }
-    // Pequeña pausa para no saturar el script
-    await new Promise(r=>setTimeout(r,150));
+    await new Promise(r=>setTimeout(r,100));
   }
 
   btn.disabled=false;
