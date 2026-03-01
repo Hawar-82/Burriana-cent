@@ -2843,7 +2843,7 @@ async function confirmImport(){
   // Crear colaboradores nuevos automáticamente
   const existingColabs = await getColaboradores();
   const existingUsers = new Set(existingColabs.map(c => c.name.toLowerCase().trim()));
-  const newSellers = [...new Set(importData.map(e => e.seller).filter(s => s && !existingUsers.has(s.toLowerCase().trim())))];
+  const newSellers = [...new Set(importData.map(e => e.seller).filter(s => s && !existingUsers.has(s.toLowerCase().trim()) && !['administrador','administrator','admin'].includes(s.toLowerCase().trim())))];
 
   for(const sellerName of newSellers){
     const user = sellerName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'.');
