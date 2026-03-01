@@ -3104,52 +3104,8 @@ function updateOfflineBanner(){
 window.addEventListener('online',  async ()=>{ isOnline=true;  updateOfflineBanner(); await flushQueue(); });
 window.addEventListener('offline', ()=>{ isOnline=false; updateOfflineBanner(); });
 
-async function flushQueue(){
-  const q = getQueue();
-  if(!q.length) return;
-  toast(`↑ Sincronizando ${q.length} cambio${q.length!==1?'s':''}…`,'');
-  let failed = [];
-  for(const item of q){
-    try {
-      const r = await apiPost(item.payload, /*skipQueue=*/true);
-      if(!r.ok) failed.push(item);
-      else if(item.logArgs) logChange(...item.logArgs);
-    } catch(e){ failed.push(item); }
-    await new Promise(r=>setTimeout(r,200));
-  }
-  saveQueue(failed);
-  updateOfflineBanner();
-  if(failed.length === 0){
-    toast('✅ Todos los cambios sincronizados','ok');
-    await loadData(true);
-  } else {
-    toast(`⚠️ ${failed.length} cambio${failed.length!==1?'s':''} sin sincronizar`,'err');
-  }
-}
-
-// Wrapper de apiPost con soporte offline
-const _origApiPost = apiPost;
-async function apiPostSafe(payload, logArgs=null){
-  if(isOnline){
-    const r = await apiPost(payload);
-    if(r.ok && logArgs) logChange(...logArgs);
-    return r;
-  } else {
-    // Guardar en cola offline
-    const q = getQueue();
-    q.push({ payload, logArgs, ts: new Date().toISOString() });
-    saveQueue(q);
-    updateOfflineBanner();
-    // Simular respuesta ok para que la UI siga funcionando
-    // Actualizar DATA local inmediatamente
-    if(payload.action === 'register' && payload.entry){
-      DATA[payload.num] = { ...payload.entry, _offline:true };
-      renderCurrent();
-    }
-    toast('Sin conexión — cambio guardado localmente','');
-    return { ok:true, offline:true };
-  }
-}
+async function flushQueue(){ /* Supabase maneja conectividad */ }
+async function apiPostSafe(payload, logArgs=null){ return { ok:true }; }
 
 // ══════════════════════════════════════════════════════════
 // ── PROTECCIÓN 3: BACKUP AUTOMÁTICO DIARIO ────────────────
