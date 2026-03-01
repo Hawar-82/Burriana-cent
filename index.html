@@ -2760,7 +2760,8 @@ function openImport(){
 function closeImport(){ document.getElementById('mi').classList.remove('open'); importData=[]; }
 
 function handleImportFile(e){
-  const file = e.target.files[0] || (e.dataTransfer && e.dataTransfer.files[0]);
+  const file = (e.target && e.target.files && e.target.files[0]) || 
+               (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
   if(!file) return;
   const reader2 = new FileReader();
   reader2.onload = ev => parseCSV(ev.target.result);
