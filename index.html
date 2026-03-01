@@ -2782,8 +2782,8 @@ function parseCSV(text){
   const iNum    = header.findIndex(h=>h.includes('n') && (h.includes('mero')||h.includes('úmero')||h==='#'||h==='num'));
   const iName   = header.findIndex(h=>h.includes('nombre'));
   const iPhone  = header.findIndex(h=>h.includes('tel') || h.includes('phone') || h.includes('cel'));
-  const iSeller = header.findIndex(h=>h.includes('vend'));
-  const iPaid   = header.findIndex(h=>h.includes('pag') || h.includes('paid'));
+  const iSeller = header.findIndex(h=>h.includes('colab') || h.includes('vend') || h.includes('seller'));
+  const iPaid   = header.findIndex(h=>h==='paid' || h==='pagado' || h==='estado pago' || h==='pago');
 
   if(iNum===-1||iName===-1){
     showMsg('import-msg','err','No se encontró columna "Número" o "Nombre" en el CSV');
@@ -2801,7 +2801,7 @@ function parseCSV(text){
     const phone  = iPhone>=0 ? (cols[iPhone]||'') : '';
     const seller = iSeller>=0 ? (cols[iSeller]||'') : (session?session.name:'');
     const paidRaw= iPaid>=0 ? (cols[iPaid]||'') : '';
-    const paid   = /^(s[ií]|1|true|pagado|yes)/i.test(paidRaw);
+    const paid   = /^(s[ií]|1|true|yes)$/i.test(paidRaw.trim()) || paidRaw.trim().toLowerCase() === 'pagado';
 
     if(!rawNum||!name){ preview.push({num,name,status:'err',msg:'Número o nombre vacío'}); continue; }
     if(!/^\d{4}$/.test(num)){ preview.push({num,name,status:'err',msg:'Número inválido'}); continue; }
