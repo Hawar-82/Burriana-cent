@@ -987,11 +987,17 @@ tr:hover td{background:var(--surface2)}
         <button class="vtab on" onclick="setView('grid',this)">🔢 Grilla</button>
         <button class="vtab"    onclick="setView('table',this)">📋 Lista</button>
         <button class="vtab" id="tab-sellers" onclick="setView('sellers',this)" style="display:none">👥 Colaboradores</button>
+        <button class="vtab" id="tab-recent" onclick="setView('recent',this)" style="display:none">🕐 Recientes</button>
       </div>
 
       <!-- SELLERS VIEW (admin only) -->
       <div id="vs" style="display:none">
         <div id="sv-grid" class="sv-grid"></div>
+      </div>
+
+      <!-- RECENT REGISTRATIONS VIEW (admin only) -->
+      <div id="vr" style="display:none">
+        <div id="recent-list" style="display:flex;flex-direction:column;gap:.5rem;padding:.5rem 0"></div>
       </div>
 
       <!-- GRID -->
@@ -1617,6 +1623,7 @@ function launchApp(){
     document.getElementById('stat-pending-wrap').style.display='';
     document.getElementById('btn-sellers').style.display='';
     document.getElementById('tab-sellers').style.display='';
+    document.getElementById('tab-recent').style.display='';
     document.getElementById('btn-changelog').style.display='';
     document.getElementById('finance-panel-wrap').style.display='';
   } else {
@@ -3176,12 +3183,53 @@ function setView(v,btn){
   document.getElementById('vg').style.display=v==='grid'?'':'none';
   document.getElementById('vt').style.display=v==='table'?'':'none';
   document.getElementById('vs').style.display=v==='sellers'?'':'none';
+  document.getElementById('vr').style.display=v==='recent'?'':'none';
   document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('on'));
   if(btn) btn.classList.add('on');
   if(v==='grid')         renderGrid();
   else if(v==='table')   renderTable();
   else if(v==='sellers') renderSellers();
+  else if(v==='recent')  renderRecent();
 }
+function renderRecent(){
+  const container = document.getElementById('recent-list');
+  // Ordenar por fecha descendente y tomar los últimos 200
+  const entries = Object.entries(DATA)
+    .filter(([,e]) => e.name)
+    .sort((a,b) => {
+      const ta = new Date(a[1].date || 0).getTime() || a[1].ts || 0;
+      const tb = new Date(b[1].date || 0).getTime() || b[1].ts || 0;
+      return tb - ta;
+    })
+    .slice(0, 200);
+
+  if(!entries.length){
+    container.innerHTML = '<div style="color:var(--text3);text-align:center;padding:2rem">No hay registros recientes</div>';
+    return;
+  }
+
+  container.innerHTML = entries.map(([num, e]) => `
+    <div onclick="openD('${num}')" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
+      padding:.75rem 1rem;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:.75rem;align-items:center;
+      transition:border-color .2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-family:'Space Mono',monospace;font-size:.95rem;font-weight:700;color:var(--gold);min-width:50px">#${num}</div>
+      <div>
+        <div style="font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.name}</div>
+        <div style="font-size:.75rem;color:var(--text3);margin-top:.15rem">
+          👤 ${e.seller||'—'} &nbsp;·&nbsp; 📅 ${e.date||'—'}
+        </div>
+      </div>
+      <div style="text-align:right;font-size:.78rem">
+        <span style="padding:.2rem .5rem;border-radius:5px;font-weight:600;
+          background:${e.paid?'var(--green-dim)':'var(--red-dim)'};
+          color:${e.paid?'var(--green)':'var(--red)'}">
+          ${e.paid?'✅ Pagado':'⏳ Pendiente'}
+        </span>
+      </div>
+    </div>
+  `).join('');
+}
+
 function renderCurrent(){
   updateStats();
   if(curView==='grid')    renderGrid();
