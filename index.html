@@ -1266,8 +1266,9 @@ const SUPABASE_KEY  = 'sb_publishable_CkDbDY89w_YKk8Q7NUC26g_oh-2Sflx';
 const ADMIN_PASS    = 'sandwil@admin1@';
 const headers = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
 
-async function sbGet(table, params='') {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, { headers });
+async function sbGet(table, params='', all=false) {
+  const extraHeaders = all ? { ...headers, 'Range-Unit': 'items', 'Range': '0-9999' } : headers;
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, { headers: extraHeaders });
   return r.ok ? await r.json() : [];
 }
 async function sbPost(table, data) {
@@ -1304,7 +1305,7 @@ async function loginCheck(user, pass, mode) {
 
 // ── Data ──────────────────────────────────────────────────
 async function loadDataFromDB() {
-  const rows = await sbGet('ventas', 'select=*&order=numero.asc&limit=10000');
+  const rows = await sbGet('ventas', 'select=*&order=numero.asc&limit=10000', true);
   const obj = {};
   rows.forEach(r => {
     obj[r.numero] = {
