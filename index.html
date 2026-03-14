@@ -543,6 +543,7 @@ tr:hover td{background:var(--surface2)}
   margin-bottom:.4rem; padding:.3rem .6rem; background:#f0f0f0 !important;
   border-radius:4px; display:flex; justify-content:space-between; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -3188,38 +3189,53 @@ function exportLibresPDF(){
     if(!ocupados.has(n)) libres.push(n);
   }
 
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const pageW = 210;
+  const marginX = 12;
+  const marginY = 15;
   const cols = 10;
-  const rows = Math.ceil(libres.length / cols);
-  let tableRows = '';
-  for(let r = 0; r < rows; r++){
-    let cells = '';
-    for(let c = 0; c < cols; c++){
-      const num = libres[r * cols + c] || '';
-      cells += `<td>${num}</td>`;
+  const colW = (pageW - marginX * 2) / cols;
+  const rowH = 7;
+  const fontSize = 8;
+
+  // Header
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('El Milagro — Números Libres', pageW / 2, marginY, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
+  doc.text(`${libres.length} números disponibles · ${new Date().toLocaleDateString('es')}`, pageW / 2, marginY + 6, { align: 'center' });
+  doc.setTextColor(0);
+
+  let x = marginX;
+  let y = marginY + 14;
+  doc.setFontSize(fontSize);
+  doc.setFont('courier', 'normal');
+
+  libres.forEach((num, idx) => {
+    // Border
+    doc.setDrawColor(200);
+    doc.rect(x, y - rowH + 2, colW, rowH, 'S');
+    // Text centered in cell
+    doc.text(num, x + colW / 2, y - 1, { align: 'center' });
+
+    if((idx + 1) % cols === 0){
+      x = marginX;
+      y += rowH;
+      // New page if needed
+      if(y > 282){
+        doc.addPage();
+        y = marginY;
+      }
+    } else {
+      x += colW;
     }
-    tableRows += `<tr>${cells}</tr>`;
-  }
+  });
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Números Libres — El Milagro</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h2 { text-align: center; margin-bottom: 4px; }
-    p  { text-align: center; color: #666; margin-bottom: 16px; font-size: 13px; }
-    table { border-collapse: collapse; width: 100%; }
-    td { border: 1px solid #ddd; padding: 5px 8px; text-align: center;
-         font-family: monospace; font-size: 13px; width: 10%; }
-    @media print { body { padding: 10px; } }
-  </style></head><body>
-  <h2>El Milagro — Números Libres</h2>
-  <p>${libres.length} números disponibles · ${new Date().toLocaleDateString('es')}</p>
-  <table>${tableRows}</table>
-  </body></html>`;
-
-  const w = window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
-  w.onload = () => w.print();
+  doc.save('numeros-libres-elmilagro.pdf');
 }
 
 function exportCSV(auto=false){
