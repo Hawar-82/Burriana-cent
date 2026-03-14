@@ -734,7 +734,10 @@ tr:hover td{background:var(--surface2)}
 
     <!-- MIS VENTAS -->
     <div style="margin-top:1.5rem">
-      <div class="phdr">📋 Números reservados</div>
+      <div class="phdr" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📋 Números reservados</span>
+        <button class="btn btn-ghost btn-sm" onclick="exportLibresPDF()" style="font-size:.75rem">📄 Libres PDF</button>
+      </div>
       <div id="my-sales-list" class="my-sales-list">
         <div style="color:var(--text3);font-size:.82rem;text-align:center;padding:1rem">
           Aún no hay ventas registradas
@@ -965,6 +968,7 @@ tr:hover td{background:var(--surface2)}
           <button class="btn btn-gold btn-full" onclick="exportPDF()">📄 Reporte PDF</button>
           <div style="display:flex;gap:.5rem">
             <button class="btn btn-ghost btn-full" onclick="exportCSV()">📊 Descargar CSV</button>
+            <button class="btn btn-ghost btn-full" onclick="exportLibresPDF()">📄 Números libres PDF</button>
             <button class="btn btn-ghost btn-sm" onclick="loadData()" title="Actualizar datos">↻</button>
           </div>
           <button class="btn btn-ghost btn-full" id="import-btn" onclick="openImport()" style="border-color:var(--blue);color:var(--blue)">
@@ -3176,6 +3180,48 @@ function triggerAutoBackup(){
 // ══════════════════════════════════════════════════════════
 
 // ── EXPORT CSV ─────────────────────────────────────────────
+function exportLibresPDF(){
+  const ocupados = new Set(Object.keys(DATA));
+  const libres = [];
+  for(let i = 1; i <= 10000; i++){
+    const n = String(i).padStart(4,'0');
+    if(!ocupados.has(n)) libres.push(n);
+  }
+
+  const cols = 10;
+  const rows = Math.ceil(libres.length / cols);
+  let tableRows = '';
+  for(let r = 0; r < rows; r++){
+    let cells = '';
+    for(let c = 0; c < cols; c++){
+      const num = libres[r * cols + c] || '';
+      cells += `<td>${num}</td>`;
+    }
+    tableRows += `<tr>${cells}</tr>`;
+  }
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Números Libres — El Milagro</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { text-align: center; margin-bottom: 4px; }
+    p  { text-align: center; color: #666; margin-bottom: 16px; font-size: 13px; }
+    table { border-collapse: collapse; width: 100%; }
+    td { border: 1px solid #ddd; padding: 5px 8px; text-align: center;
+         font-family: monospace; font-size: 13px; width: 10%; }
+    @media print { body { padding: 10px; } }
+  </style></head><body>
+  <h2>El Milagro — Números Libres</h2>
+  <p>${libres.length} números disponibles · ${new Date().toLocaleDateString('es')}</p>
+  <table>${tableRows}</table>
+  </body></html>`;
+
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => w.print();
+}
+
 function exportCSV(auto=false){
   const rows=[['Número','Nombre','Teléfono','Colaborador','Estado pago','Método pago','Abonado','Pendiente abono','Saldo','Fecha']];
   Object.entries(DATA).sort(([a],[b])=>a.localeCompare(b)).forEach(([num,e])=>{
