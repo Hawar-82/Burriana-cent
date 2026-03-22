@@ -737,7 +737,10 @@ tr:hover td{background:var(--surface2)}
     <div style="margin-top:1.5rem">
       <div class="phdr" style="display:flex;justify-content:space-between;align-items:center">
         <span>📋 Números reservados</span>
-        <button class="btn btn-ghost btn-sm" onclick="exportLibresPDF()" style="font-size:.75rem">📄 Libres PDF</button>
+        <div style="display:flex;gap:.4rem">
+          <button class="btn btn-ghost btn-sm" onclick="exportMisPDF()" style="font-size:.75rem">📄 Mi informe</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportLibresPDF()" style="font-size:.75rem">📄 Libres</button>
+        </div>
       </div>
       <div id="my-sales-list" class="my-sales-list">
         <div style="color:var(--text3);font-size:.82rem;text-align:center;padding:1rem">
@@ -3178,6 +3181,122 @@ function triggerAutoBackup(){
 // ══════════════════════════════════════════════════════════
 
 // ── EXPORT CSV ─────────────────────────────────────────────
+function exportMisPDF(){
+  if(!session) return;
+  const sellerName = session.name;
+  const misNumeros = Object.entries(DATA)
+    .filter(([,e]) => e.seller === sellerName)
+    .sort((a,b) => a[0].localeCompare(b[0]));
+
+  if(!misNumeros.length){
+    toast('No tienes números registrados','err');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = 210;
+  const margin = 12;
+
+  // ── Header ──
+  doc.setFillColor(13, 14, 20);
+  doc.rect(0, 0, pageW, 28, 'F');
+  doc.setTextColor(240, 184, 64);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('El Milagro', margin, 11);
+  doc.setTextColor(180, 180, 200);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Informe de ventas — ' + sellerName, margin, 18);
+  doc.text(new Date().toLocaleDateString('es', {day:'2-digit',month:'2-digit',year:'numeric'}), pageW - margin, 18, { align: 'right' });
+
+  // ── Stats ──
+  const totalReservados = misNumeros.length;
+  const totalPagados    = misNumeros.filter(([,e]) => e.paid).length;
+  const totalAbonado    = misNumeros.reduce((s,[,e]) => s + (e.abonos||0), 0);
+  const totalPendiente  = misNumeros.reduce((s,[,e]) => s + Math.max(0, TICKET - (e.abonos||0) - (e.abonosPending||0)), 0);
+
+  doc.setTextColor(0);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  let sy = 36;
+  const stats = [
+    ['Números reservados', totalReservados],
+    ['Pagados completos',  totalPagados],
+    ['Total abonado',      fmt(totalAbonado)],
+    ['Saldo pendiente',    fmt(totalPendiente)],
+  ];
+  stats.forEach(([label, val], i) => {
+    const x = margin + (i % 2) * 90;
+    const y = sy + Math.floor(i / 2) * 8;
+    doc.setFont('helvetica', 'bold');
+    doc.text(String(val), x + 55, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(label, x, y);
+    doc.setTextColor(0);
+  });
+
+  // ── Table ──
+  let y = sy + 20;
+  const cols = { num: margin, name: margin+16, abono: margin+110, estado: margin+130, saldo: margin+158 };
+  const rowH = 7;
+
+  // Header row
+  doc.setFillColor(240, 184, 64);
+  doc.rect(margin, y-5, pageW - margin*2, rowH, 'F');
+  doc.setTextColor(13, 14, 20);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('#', cols.num, y);
+  doc.text('Nombre comprador', cols.name, y);
+  doc.text('Abonado', cols.abono, y);
+  doc.text('Estado', cols.estado, y);
+  doc.text('Saldo', cols.saldo, y);
+  y += rowH;
+
+  // Data rows
+  doc.setFont('helvetica', 'normal');
+  misNumeros.forEach(([num, e], idx) => {
+    if(y > 275) {
+      doc.addPage();
+      y = 20;
+    }
+    // Alternate row background
+    if(idx % 2 === 0){
+      doc.setFillColor(245, 245, 252);
+      doc.rect(margin, y-5, pageW - margin*2, rowH, 'F');
+    }
+    const abonado  = e.abonos || 0;
+    const saldo    = Math.max(0, TICKET - abonado - (e.abonosPending||0));
+    const estado   = e.paid ? 'Pagado' : e.paymentClaim ? 'Reportado' : abonado > 0 ? 'Abonado' : 'Pendiente';
+    const estadoColor = e.paid ? [40, 160, 80] : e.paymentClaim ? [200, 140, 0] : abonado > 0 ? [60, 120, 200] : [180, 60, 60];
+
+    doc.setTextColor(0);
+    doc.setFontSize(7.5);
+    doc.text('#' + num, cols.num, y);
+    // Truncate long names
+    const nameStr = e.name.length > 35 ? e.name.substring(0, 33) + '…' : e.name;
+    doc.text(nameStr, cols.name, y);
+    doc.text(fmt(abonado), cols.abono + 15, y, { align: 'right' });
+    doc.setTextColor(...estadoColor);
+    doc.text(estado, cols.estado, y);
+    doc.setTextColor(saldo > 0 ? 180 : 40, saldo > 0 ? 60 : 160, saldo > 0 ? 60 : 80);
+    doc.text(saldo > 0 ? fmt(saldo) : '✓', cols.saldo + 15, y, { align: 'right' });
+    y += rowH;
+  });
+
+  // Footer line
+  doc.setDrawColor(200);
+  doc.line(margin, y+2, pageW-margin, y+2);
+  doc.setTextColor(120);
+  doc.setFontSize(7);
+  doc.text('El Milagro · Informe generado el ' + new Date().toLocaleString('es'), pageW/2, y+7, { align: 'center' });
+
+  doc.save(`informe-${sellerName.replace(/\s+/g,'-').toLowerCase()}.pdf`);
+}
+
 function exportLibresPDF(){
   const ocupados = new Set(Object.keys(DATA));
   const libres = [];
