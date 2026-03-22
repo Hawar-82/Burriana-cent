@@ -1326,12 +1326,13 @@ async function loadDataFromDB() {
     if(!r.ok) break;
     const rows = await r.json();
     if(!Array.isArray(rows) || rows.length === 0) break;
-    rows.forEach(r => {
-      obj[r.numero] = {
-        name: r.buyer, phone: r.phone, seller: r.seller,
-        paid: r.paid, paymentClaim: r.payment_claim,
-        abonos: r.abonos, abonosPending: r.abonos_pending,
-        paymethod: r.method, date: r.fecha
+    rows.forEach(row => {
+      obj[row.numero] = {
+        name: row.buyer, phone: row.phone, seller: row.seller,
+        paid: row.paid, paymentClaim: row.payment_claim,
+        abonos: row.abonos, abonosPending: row.abonos_pending,
+        paymethod: row.method, date: row.fecha,
+        createdAt: row.created_at
       };
     });
     if(rows.length < pageSize) break;
@@ -1390,16 +1391,13 @@ async function deleteColaborador(user) {
 // ════════════════════════════════════════════════════════
 
 // ── PRECIO DEL BILLETE ────────────────────────────────────
+const NOMBRE = 'El Milagro';
 let TICKET = 100;
 const CURRENCY   = '';
 // ─────────────────────────────────────────────────────────
 // Cada colaborador tiene: nombre, usuario y contraseña propios.
 // El admin puede gestionar esta lista desde dentro de la app.
-let SELLERS = [
-  { name:'Ana López',    user:'ana.lopez',    pass:'rifa001' },
-  { name:'Pedro Ruiz',   user:'pedro.ruiz',   pass:'rifa002' },
-  { name:'Luis Torres',  user:'luis.torres',  pass:'rifa003' },
-];
+let SELLERS = [];
 // ─────────────────────────────────────────────────────────
 
 const pad = n => String(n).padStart(4,'0');
@@ -1416,14 +1414,17 @@ function toast(msg, type=''){
 }
 function showMsg(id,type,txt){
   const el=document.getElementById(id);
+  if(!el) return;
   el.className='msg '+type; el.textContent=txt;
-  setTimeout(()=>{el.className='msg';el.textContent='';},5000);
+  setTimeout(()=>{ if(el){ el.className='msg'; el.textContent=''; } },5000);
 }
 function setDot(state){
-  const d=document.getElementById('sdot');
-  if(!d)return;
-  d.className='sdot'+(state==='off'?' off':state==='loading'?' loading':'');
-  d.title=state==='off'?'Sin conexión':state==='loading'?'Cargando…':'Conectado';
+  ['sdot','sdot-s'].forEach(id => {
+    const d=document.getElementById(id);
+    if(!d) return;
+    d.className='sdot'+(state==='off'?' off':state==='loading'?' loading':'');
+    d.title=state==='off'?'Sin conexión':state==='loading'?'Cargando…':'Conectado';
+  });
 }
 const fmt = n => Number(n||0).toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:0});
 
@@ -2989,10 +2990,6 @@ function saveSeller(){
   const dupIdx = SELLERS.findIndex((s,i) => s.user === user && i !== editSellerIdx);
   if(dupIdx >= 0){ showMsg('sellers-msg','err',`El usuario "${user}" ya existe`); return; }
 
-  const payload = editSellerIdx !== null
-    ? { action:'saveSeller', token:getAdminToken(), sellerName:name, sellerPhone:phone, sellerUser:user, sellerPass:pass, editUser: SELLERS[editSellerIdx].user }
-    : { action:'saveSeller', token:getAdminToken(), sellerName:name, sellerPhone:phone, sellerUser:user, sellerPass:pass };
-
   saveColaborador({ name, phone, user, pass, editUser: editSellerIdx !== null ? SELLERS[editSellerIdx].user : null }).then(r => {
     if(!r.ok){ showMsg('sellers-msg','err','Error al guardar'); return; }
     if(editSellerIdx !== null){
@@ -3277,8 +3274,8 @@ function renderRecent(){
   const entries = Object.entries(DATA)
     .filter(([,e]) => e.name)
     .sort((a,b) => {
-      const ta = new Date(a[1].date || 0).getTime() || a[1].ts || 0;
-      const tb = new Date(b[1].date || 0).getTime() || b[1].ts || 0;
+      const ta = a[1].createdAt ? new Date(a[1].createdAt).getTime() : 0;
+      const tb = b[1].createdAt ? new Date(b[1].createdAt).getTime() : 0;
       return tb - ta;
     })
     .slice(0, 200);
@@ -3461,10 +3458,10 @@ function renderDisponibles(lista){
   }
   container.innerHTML = lista.map(n =>
     `<div onclick="seleccionarDisponible('${n}')"
-      style="background:var(--bg);border:1px solid var(--borde);border-radius:6px;
+      style="background:var(--bg);border:1px solid var(--border);border-radius:6px;
       padding:.35rem .6rem;font-family:'Space Mono',monospace;font-size:.82rem;
       color:var(--green);cursor:pointer;transition:background .15s"
-      onmouseover="this.style.background='var(--card2)'"
+      onmouseover="this.style.background='var(--surface2)'"
       onmouseout="this.style.background='var(--bg)'">${n}</div>`
   ).join('');
 }
@@ -3485,9 +3482,9 @@ function seleccionarDisponible(num){
 <div id="modal-disponibles-overlay" onclick="if(event.target===this)closeNumDisponibles()"
   style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;
   align-items:center;justify-content:center;padding:1rem">
-  <div style="background:var(--card);border-radius:14px;border:1px solid var(--borde);
+  <div style="background:var(--card);border-radius:14px;border:1px solid var(--border);
     width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
-    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--borde);
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);
       display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-weight:700;color:var(--gold)">📋 Números disponibles</div>
@@ -3495,10 +3492,10 @@ function seleccionarDisponible(num){
       </div>
       <button class="xbtn" onclick="closeNumDisponibles()">✕</button>
     </div>
-    <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--borde)">
+    <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border)">
       <input type="text" inputmode="numeric" placeholder="Buscar número..."
         oninput="filterDisponibles(this.value)"
-        style="width:100%;background:var(--bg);border:1px solid var(--borde);border-radius:8px;
+        style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
         padding:.5rem .75rem;color:var(--text1);font-size:.9rem;outline:none">
     </div>
     <div id="disp-list" style="overflow-y:auto;padding:.75rem 1.25rem;
