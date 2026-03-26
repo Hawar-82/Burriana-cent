@@ -7,34 +7,39 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0d0e14; --surface:#141520; --surface2:#1b1d2a; --surface3:#222538;
-  --border:#2a2d42; --border2:#353858;
-  --text:#e2e4f0; --text2:#8890b8; --text3:#525878;
+  --bg:#0f0900; --surface:#1a1100; --surface2:#241800; --surface3:#2e2000;
+  --border:rgba(200,150,0,0.25); --border2:rgba(200,150,0,0.4);
+  --text:#e8d48a; --text2:rgba(210,170,80,0.7); --text3:rgba(200,150,50,0.45);
   --gold:#f0b840; --gold-dim:rgba(240,184,64,0.12);
   --green:#34c472; --green-dim:rgba(52,196,114,0.12);
   --red:#e05050;   --red-dim:rgba(224,80,80,0.1);
-  --blue:#5090f0;  --blue-dim:rgba(80,144,240,0.12);
+  --blue:#f5a623;  --blue-dim:rgba(245,166,35,0.12);
   --orange:#f07840;
-  --shadow:0 2px 12px rgba(0,0,0,0.3);
-  --shadow-lg:0 8px 40px rgba(0,0,0,0.5);
+  --shadow:0 2px 12px rgba(0,0,0,0.4);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.7), 0 0 60px rgba(180,120,0,0.1);
   --r:10px;
+}
+body {
+  background: linear-gradient(135deg, #0f0900 0%, #1e1400 40%, #0f0900 100%) fixed;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden}
 
 /* LOGIN */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(ellipse at 55% 40%,#1a1f38 0%,var(--bg) 70%)}
-.lcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;
-  padding:2.5rem 2rem;width:100%;max-width:420px;box-shadow:var(--shadow-lg)}
-.brand{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;letter-spacing:-.03em;margin-bottom:.2rem}
+  background:radial-gradient(ellipse at 50% 30%, rgba(180,120,0,0.2) 0%, transparent 70%)}
+.lcard{background:rgba(25,17,0,0.9);border:1px solid rgba(200,150,0,0.4);border-radius:16px;
+  padding:2.5rem 2rem;width:100%;max-width:420px;box-shadow:var(--shadow-lg);
+  backdrop-filter:blur(10px)}
+.brand{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;letter-spacing:-.03em;margin-bottom:.2rem;
+  background:linear-gradient(135deg,#e8c84a,#f5a623);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .brand span{color:var(--gold)}
 .brand-sub{color:var(--text3);font-size:.85rem;margin-bottom:2rem}
 .rtabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);
   border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
 .rtab{padding:.6rem;border:none;background:transparent;color:var(--text2);
   font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:500;cursor:pointer;transition:all .2s}
-.rtab.on{background:var(--gold);color:#0d0e14;font-weight:700}
+.rtab.on{background:linear-gradient(135deg,#c8960a,#f5a623);color:#1a1000;font-weight:700}
 
 /* FORM */
 .fg{margin-bottom:.85rem}
@@ -49,7 +54,7 @@ select option{background:var(--surface2)}
   padding:.65rem 1.1rem;border:none;border-radius:8px;font-family:'Outfit',sans-serif;
   font-size:.88rem;font-weight:600;cursor:pointer;transition:all .18s;white-space:nowrap}
 .btn-full{width:100%}
-.btn-gold{background:var(--gold);color:#0d0e14}
+.btn-gold{background:linear-gradient(135deg,#c8960a,#f5a623);color:#1a1000}
 .btn-gold:hover{background:#f5c840;transform:translateY(-1px)}
 .btn-ghost{background:transparent;border:1.5px solid var(--border2);color:var(--text2)}
 .btn-ghost:hover{border-color:var(--text2);color:var(--text)}
@@ -59,9 +64,9 @@ select option{background:var(--surface2)}
 
 /* APP */
 #app{display:none}
-header{height:56px;background:var(--surface);border-bottom:1px solid var(--border);
+header{height:56px;background:rgba(15,9,0,0.95);border-bottom:1px solid rgba(200,150,0,0.2);
   display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;
-  position:sticky;top:0;z-index:100}
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
 .hbrand{font-family:'Syne',sans-serif;font-size:1.25rem;font-weight:800;letter-spacing:-.02em}
 .hbrand span{color:var(--gold)}
 .hright{display:flex;align-items:center;gap:.75rem;font-size:.85rem}
