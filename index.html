@@ -3783,9 +3783,9 @@ function closeTicketModal() {
 }
 
 function downloadTicketPDF() {
-  const area = document.getElementById('ticket-preview-area');
-  if(!area || !area.innerHTML.trim()) return;
-  const numText = document.getElementById('ticket-modal-num').textContent;
+  if(!currentD || !DATA[currentD]) return;
+  const numText = '#' + String(currentD).padStart(4,'0');
+  const ticketHTML = makeTicketHTML(currentD, DATA[currentD]);
 
   const win = window.open('','_blank','width=600,height=800');
   win.document.write(`<!DOCTYPE html><html lang="es"><head>
@@ -3823,11 +3823,11 @@ function downloadTicketPDF() {
     .ant-sep{width:55%;height:2px;background:#d4a820;margin:2px 0}
     .ant-date{font-family:'Crimson Pro',serif;font-size:.55rem;font-weight:600;color:#ffffff;line-height:1.25}
     .ticket-nota{margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12);font-family:'IM Fell English',serif;font-size:.5rem;font-style:italic;color:#ffffff;text-align:center;line-height:1.3;opacity:.8}
-    .ticket-footer{background:#ffffff;border-radius:0 0 10px 10px;display:flex;justify-content:center;align-items:center;padding:9px 0 11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .ticket-footer{background:linear-gradient(135deg,#0a1a40,#0d2454);border-radius:0 0 10px 10px;display:flex;justify-content:center;align-items:center;padding:9px 0 11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .ticket-number-badge{background:white;border-radius:8px;padding:5px 24px;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:#7a1a2a;letter-spacing:.15em;min-width:120px;text-align:center}
     @media print{body{padding:10mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
   </style></head><body>
-  ${area.innerHTML}
+  ${ticketHTML}
   <script>document.fonts.ready.then(()=>setTimeout(()=>window.print(),400));<\/script>
   </body></html>`);
   win.document.close();
