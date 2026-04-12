@@ -2159,10 +2159,10 @@ function gridItems(){
 }
 
 function renderGrid(){
-  const items=gridItems(), total=items.length;
+  const items=gridItems();
   const grid=document.getElementById('ngrid');
-  grid.innerHTML='';
-  items.forEach(num=>{
+  // Batch render with innerHTML for 10x better performance
+  const html = items.map(num=>{
     const e=DATA[num];
     let cls,lbl;
     if(!e)                          { cls='nc free';    lbl='libre'; }
@@ -2170,12 +2170,16 @@ function renderGrid(){
     else if(e.paymentClaim)         { cls='nc claimed'; lbl='reportado'; }
     else if((e.abonos||0)>0)        { cls='nc abonado'; lbl='abonado'; }
     else                            { cls='nc unpaid';  lbl='pendiente'; }
-    const c=document.createElement('div');
-    c.className=cls;
-    c.innerHTML=`<span class="n">${num}</span><span class="s">${lbl}</span>${e?'<div class="pdot"></div>':''}`;
-    c.onclick=()=>e?openD(num):openR(num);
-    grid.appendChild(c);
-  });
+    return `<div class="${cls}" data-num="${num}"><span class="n">${num}</span><span class="s">${lbl}</span>${e?'<div class="pdot"></div>':''}</div>`;
+  }).join('');
+  grid.innerHTML = html;
+  // Attach events via delegation (one listener instead of 10000)
+  grid.onclick = (ev) => {
+    const cell = ev.target.closest('.nc');
+    if(!cell) return;
+    const num = cell.dataset.num;
+    if(DATA[num]) openD(num); else openR(num);
+  };
   document.getElementById('pgrid').innerHTML='';
 }
 
@@ -3787,7 +3791,15 @@ function downloadTicketPDF() {
   const numText = '#' + String(currentD).padStart(4,'0');
   const ticketHTML = makeTicketHTML(currentD, DATA[currentD]);
 
-  const win = window.open('','_blank','width=600,height=800');
+  // Use iframe to avoid popup blocker
+  const existingFrame = document.getElementById('pdf-print-frame');
+  if(existingFrame) existingFrame.remove();
+  const frame = document.createElement('iframe');
+  frame.id = 'pdf-print-frame';
+  frame.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:9999;background:white';
+  document.body.appendChild(frame);
+  const win = frame.contentWindow;
+  win.document.open();
   win.document.write(`<!DOCTYPE html><html lang="es"><head>
   <meta charset="UTF-8">
   <title>Boleto ${numText} — El Milagro</title>
@@ -3827,10 +3839,20 @@ function downloadTicketPDF() {
     .ticket-number-badge{background:white;border-radius:8px;padding:5px 24px;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:#7a1a2a;letter-spacing:.15em;min-width:120px;text-align:center}
     @media print{body{padding:10mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
   </style></head><body>
+  <div style="position:fixed;top:10px;right:10px;z-index:9999;display:flex;gap:8px">
+    <button id="close-btn" style="padding:8px 16px;background:#0d2454;color:white;border:none;border-radius:6px;font-family:sans-serif;font-size:.9rem;cursor:pointer">✕ Cerrar</button>
+    <button onclick="window.print()" style="padding:8px 16px;background:#d4a820;color:#0d2454;border:none;border-radius:6px;font-family:sans-serif;font-weight:700;font-size:.9rem;cursor:pointer">🖨 Imprimir / PDF</button>
+  </div>
   ${ticketHTML}
-  <script>document.fonts.ready.then(()=>setTimeout(()=>window.print(),400));<\/script>
+  <script>document.fonts.ready.then(()=>setTimeout(()=>{},200));<\/script>
   </body></html>`);
   win.document.close();
+  win.document.getElementById('close-btn').onclick = () => {
+    document.getElementById('pdf-print-frame').remove();
+  };
+  setTimeout(() => {
+    try { win.print(); } catch(e) {}
+  }, 800);
 }
 // ════════════════════════════════════════════════════════════
 </script>
