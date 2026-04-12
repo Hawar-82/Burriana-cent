@@ -3777,6 +3777,7 @@ function makeTicketHTML(num, entry) {
 function openTicketModal(num) {
   const e = DATA[num];
   if(!e) return;
+  currentD = num; // Asegurar que currentD esté siempre actualizado
   document.getElementById('ticket-modal-num').textContent = '#' + String(num).padStart(4,'0');
   document.getElementById('ticket-preview-area').innerHTML = makeTicketHTML(num, e);
   document.getElementById('ticket-modal').classList.add('open');
@@ -3791,16 +3792,7 @@ function downloadTicketPDF() {
   const numText = '#' + String(currentD).padStart(4,'0');
   const ticketHTML = makeTicketHTML(currentD, DATA[currentD]);
 
-  // Use iframe to avoid popup blocker
-  const existingFrame = document.getElementById('pdf-print-frame');
-  if(existingFrame) existingFrame.remove();
-  const frame = document.createElement('iframe');
-  frame.id = 'pdf-print-frame';
-  frame.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:9999;background:white';
-  document.body.appendChild(frame);
-  const win = frame.contentWindow;
-  win.document.open();
-  win.document.write(`<!DOCTYPE html><html lang="es"><head>
+  const fullHTML = `<!DOCTYPE html><html lang="es"><head>
   <meta charset="UTF-8">
   <title>Boleto ${numText} — El Milagro</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=IM+Fell+English:ital@0;1&family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet">
@@ -3838,63 +3830,25 @@ function downloadTicketPDF() {
     .ticket-footer{background:linear-gradient(135deg,#0a1a40,#0d2454);border-radius:0 0 10px 10px;display:flex;justify-content:center;align-items:center;padding:9px 0 11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .ticket-number-badge{background:white;border-radius:8px;padding:5px 24px;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:#7a1a2a;letter-spacing:.15em;min-width:120px;text-align:center}
     @media print{body{padding:10mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
-  </style></head><body>
-  <div style="position:fixed;top:10px;right:10px;z-index:9999;display:flex;gap:8px">
-    <button id="close-btn" style="padding:8px 16px;background:#0d2454;color:white;border:none;border-radius:6px;font-family:sans-serif;font-size:.9rem;cursor:pointer">✕ Cerrar</button>
-    <button onclick="window.print()" style="padding:8px 16px;background:#d4a820;color:#0d2454;border:none;border-radius:6px;font-family:sans-serif;font-weight:700;font-size:.9rem;cursor:pointer">🖨 Imprimir / PDF</button>
+  </style>
+  </head><body>
+  <div style="position:fixed;top:10px;right:10px;z-index:9999;display:flex;gap:8px;print:none">
+    <button onclick="window.close()" style="padding:8px 16px;background:#0d2454;color:white;border:none;border-radius:6px;font-family:sans-serif;cursor:pointer">✕ Cerrar</button>
+    <button onclick="window.print()" style="padding:8px 16px;background:#d4a820;color:#0d2454;border:none;border-radius:6px;font-family:sans-serif;font-weight:700;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
   </div>
   ${ticketHTML}
-  <script>document.fonts.ready.then(()=>setTimeout(()=>{},200));<\/script>
-  </body></html>`);
-  win.document.close();
-  win.document.getElementById('close-btn').onclick = () => {
-    document.getElementById('pdf-print-frame').remove();
-  };
-  setTimeout(() => {
-    try { win.print(); } catch(e) {}
-  }, 800);
+  </body></html>`;
+
+  const blob = new Blob([fullHTML], {type: 'text/html'});
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if(!win) {
+    // Fallback si popup bloqueado - descargar como archivo
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `boleto-${String(currentD).padStart(4,'0')}.html`;
+    a.click();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-// ════════════════════════════════════════════════════════════
-</script>
-<!-- MODAL NÚMEROS DISPONIBLES -->
-<div id="modal-disponibles-overlay" onclick="if(event.target===this)closeNumDisponibles()"
-  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;
-  align-items:center;justify-content:center;padding:1rem">
-  <div style="background:var(--card);border-radius:14px;border:1px solid var(--border);
-    width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
-    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);
-      display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-weight:700;color:var(--gold)">📋 Números disponibles</div>
-        <div style="font-size:.78rem;color:var(--text3)" id="disp-count"></div>
-      </div>
-      <button class="xbtn" onclick="closeNumDisponibles()">✕</button>
-    </div>
-    <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border)">
-      <input type="text" inputmode="numeric" placeholder="Buscar número..."
-        oninput="filterDisponibles(this.value)"
-        style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
-        padding:.5rem .75rem;color:var(--text1);font-size:.9rem;outline:none">
-    </div>
-    <div id="disp-list" style="overflow-y:auto;padding:.75rem 1.25rem;
-      display:flex;flex-wrap:wrap;gap:.4rem"></div>
-  </div>
-</div>
 
-
-<!-- TICKET MODAL -->
-<div class="ticket-modal-overlay" id="ticket-modal">
-  <div class="ticket-modal-box">
-    <div class="ticket-modal-header">
-      <h3>🎟 Boleto — <span id="ticket-modal-num"></span></h3>
-      <button onclick="closeTicketModal()" class="btn btn-ghost btn-sm">✕</button>
-    </div>
-    <div id="ticket-preview-area"></div>
-    <div style="display:flex;gap:.75rem;margin-top:1rem">
-      <button class="btn btn-gold btn-full" onclick="downloadTicketPDF()">⬇ Descargar PDF</button>
-      <button class="btn btn-ghost btn-full" onclick="closeTicketModal()">Cerrar</button>
-    </div>
-  </div>
-</div>
-</body>
-</html>
