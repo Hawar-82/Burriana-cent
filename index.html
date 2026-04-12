@@ -622,15 +622,15 @@ tr:hover td{background:var(--surface2)}
 .pm-sub { font-family:'IM Fell English',serif;font-size:.72rem;font-style:italic;color:#ffffff;opacity:.75 }
 .ticket-layout { display:flex;align-items:stretch }
 .ticket-title-col { display:flex;flex-direction:column;justify-content:center;padding-right:8px;border-right:1.5px solid rgba(30,21,8,.2);min-width:68px;max-width:76px }
-.title-gran { font-family:'Playfair Display',serif;font-size:.9rem;font-weight:900;text-transform:uppercase;letter-spacing:.10em;color:#ffffff;line-height:1.15;margin-bottom:.4rem }
-.title-el { font-family:'Playfair Display',serif;font-size:1.65rem;font-weight:900;font-style:italic;color:#ffffff;line-height:.9 }
+.title-gran { font-family:'Playfair Display',serif;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#ffffff;line-height:1.15;margin-bottom:.3rem }
+.title-el { font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:900;font-style:italic;color:#ffffff;line-height:.95 }
 .anticipados { display:flex;flex:1 }
 .anticipado { flex:1;padding:3px 3px 3px 6px;display:flex;flex-direction:column;gap:1px;border-right:1px solid rgba(30,21,8,.16);min-width:0;overflow:hidden }
 .anticipado:last-child { border-right:none }
-.ant-label { font-family:'Crimson Pro',serif;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#ffffff;line-height:1.2;white-space:nowrap }
-.ant-prize { font-family:'Playfair Display',serif;font-size:1rem;font-weight:900;color:#ffffff;line-height:1;white-space:nowrap }
+.ant-label { font-family:'Crimson Pro',serif;font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:#ffffff;line-height:1.2;white-space:nowrap }
+.ant-prize { font-family:'Playfair Display',serif;font-size:.88rem;font-weight:900;color:#ffffff;line-height:1;white-space:nowrap }
 .ant-sep { width:55%;height:2px;background:linear-gradient(90deg,#d4a820,#f5d060,#d4a820);margin:2px 0;border-radius:1px }
-.ant-date { font-family:'Crimson Pro',serif;font-size:.72rem;font-weight:600;color:#ffffff;line-height:1.25 }
+.ant-date { font-family:'Crimson Pro',serif;font-size:.55rem;font-weight:600;color:#ffffff;line-height:1.2 }
 .ticket-nota { margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.15);font-family:'IM Fell English',serif;font-size:.65rem;font-style:italic;color:#ffffff;text-align:center;line-height:1.3;opacity:.8 }
 .ticket-footer { background:linear-gradient(135deg,#0a1a40,#0d2454);border-radius:0 0 10px 10px;display:flex;justify-content:center;align-items:center;padding:9px 0 11px;-webkit-print-color-adjust:exact;print-color-adjust:exact }
 .ticket-number-badge { background:linear-gradient(135deg,#fff,#f8f0f0);border-radius:10px;padding:5px 24px;font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:900;color:#7a1a2a;letter-spacing:.15em;min-width:110px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.4) }
@@ -3704,9 +3704,9 @@ function seleccionarDisponible(num){
 
 // ══ TICKET GENERATOR ════════════════════════════════════════
 const ANTICIPADOS_T = [
-  { roman: 'I',   prize: '10.000€', date: '02 de Mayo\nde 2026' },
-  { roman: 'II',  prize: '12.000€', date: '20 de Junio\nde 2026' },
-  { roman: 'III', prize: '15.000€', date: '29 de Agosto\nde 2026' },
+  { roman: 'I',   prize: '10.000€', date: '02 de Mayo\nde 2026',    abono: '30€' },
+  { roman: 'II',  prize: '12.000€', date: '20 de Junio\nde 2026',   abono: '60€' },
+  { roman: 'III', prize: '15.000€', date: '29 de Agosto\nde 2026',  abono: '100€' },
 ];
 
 function makeTicketHTML(num, entry) {
@@ -3724,7 +3724,7 @@ function makeTicketHTML(num, entry) {
     { label: 'TEL:',            val: fields.tel },
     { label: 'COLABORADOR:',    val: fields.vendedor },
     { label: 'FECHA DE VENTA:', val: fields.fecha },
-    { label: 'ABONO:',          val: fields.abono },
+    { label: 'ABONO:', val: fields.abono, highlight: true },
   ];
   return `
     <div class="boleto-wrap">
@@ -3733,7 +3733,7 @@ function makeTicketHTML(num, entry) {
           ${stubRows.map(r => `
             <div class="stub-field">
               <span class="stub-label">${r.label}</span>
-              <span class="stub-value">${r.val || ''}</span>
+              <span class="stub-value" style="${r.highlight ? 'font-size:1.1rem;font-weight:800;color:#d4a820;letter-spacing:.03em' : ''}">${r.val || ''}</span>
             </div>`).join('')}
         </div>
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex-shrink:0">
@@ -3763,6 +3763,7 @@ function makeTicketHTML(num, entry) {
                 <div class="ant-prize">${a.prize}</div>
                 <div class="ant-sep"></div>
                 <div class="ant-date">${a.date.replace('\n','<br>')}</div>
+                <div style="font-family:'Crimson Pro',serif;font-size:.5rem;font-weight:700;color:#d4a820;margin-top:1px">Abono: ${a.abono}</div>
               </div>`).join('')}
           </div>
         </div>
@@ -3788,67 +3789,52 @@ function closeTicketModal() {
 }
 
 function downloadTicketPDF() {
-  if(!currentD || !DATA[currentD]) return;
-  const numText = '#' + String(currentD).padStart(4,'0');
+  if(!currentD || !DATA[currentD]) { toast('No hay número seleccionado','err'); return; }
+  const numPad = String(currentD).padStart(4,'0');
   const ticketHTML = makeTicketHTML(currentD, DATA[currentD]);
 
-  const fullHTML = `<!DOCTYPE html><html lang="es"><head>
-  <meta charset="UTF-8">
-  <title>Boleto ${numText} — El Milagro</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=IM+Fell+English:ital@0;1&family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{background:white;padding:20mm;font-family:'Crimson Pro',serif;display:flex;justify-content:center}
-    .boleto-wrap{display:flex;flex-direction:column;align-items:stretch;width:100%;max-width:380px;filter:drop-shadow(0 4px 20px rgba(0,0,0,0.3))}
-    .stub{background:#1a3a7a;border-radius:12px 12px 0 0;padding:14px 24px 12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .stub-fields{display:flex;flex-direction:row;gap:10px;align-items:center}
-    .stub-field{display:flex;flex-direction:column;border-bottom:1px dotted rgba(255,255,255,0.2);padding:5px 0 3px}
-    .stub-field:last-child{border-bottom:none}
-    .stub-label{font-family:'Playfair Display',serif;font-size:.63rem;font-weight:700;color:#ffffff;letter-spacing:.07em}
-    .stub-value{font-family:'Crimson Pro',serif;font-size:.85rem;font-weight:600;color:#ffffff;min-height:15px}
-    .diamond-sep{background:#1a3a7a;width:100%;height:22px;display:flex;align-items:center;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .diamond-sep::after{content:'';display:block;width:100%;height:18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Cellipse cx='9' cy='9' rx='7' ry='5' fill='%235c6b5c'/%3E%3C/svg%3E");background-size:18px 18px;background-repeat:repeat-x;background-position:center}
-    .hc{position:absolute;width:14px;height:14px;background:#02040c;border-radius:50%;top:50%;transform:translateY(-50%);z-index:2}
-    .hc-l{left:-7px}.hc-r{right:-7px}
-    .ticket-body{background:#1e4a94;padding:14px 18px 12px;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .premio-mayor{text-align:center;padding-bottom:9px;margin-bottom:9px;border-bottom:1.5px solid rgba(255,255,255,.15)}
-    .pm-label{font-family:'Playfair Display',serif;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:#ffffff;opacity:.7;display:block;margin-bottom:2px}
-    .pm-value{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:#ffffff;line-height:1.05}
-    .pm-sub{font-family:'IM Fell English',serif;font-size:.58rem;font-style:italic;color:#ffffff;opacity:.65}
-    .ticket-layout{display:flex;align-items:stretch}
-    .ticket-title-col{display:flex;flex-direction:column;justify-content:center;padding-right:8px;border-right:1.5px solid rgba(255,255,255,.18);min-width:70px;max-width:78px}
-    .title-gran{font-family:'Playfair Display',serif;font-size:.75rem;font-weight:900;text-transform:uppercase;letter-spacing:.10em;color:#ffffff;line-height:1.15}
-    .title-el{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:900;font-style:italic;color:#ffffff;line-height:.9}
-    .anticipados{display:flex;flex:1}
-    .anticipado{flex:1;padding:3px 3px 3px 7px;display:flex;flex-direction:column;gap:1px;border-right:1px solid rgba(255,255,255,.12);min-width:0;overflow:hidden}
-    .anticipado:last-child{border-right:none}
-    .ant-label{font-family:'Crimson Pro',serif;font-size:.47rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#ffffff;line-height:1.2;white-space:nowrap}
-    .ant-prize{font-family:'Playfair Display',serif;font-size:.8rem;font-weight:900;color:#ffffff;line-height:1;white-space:nowrap}
-    .ant-sep{width:55%;height:2px;background:#d4a820;margin:2px 0}
-    .ant-date{font-family:'Crimson Pro',serif;font-size:.55rem;font-weight:600;color:#ffffff;line-height:1.25}
-    .ticket-nota{margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12);font-family:'IM Fell English',serif;font-size:.5rem;font-style:italic;color:#ffffff;text-align:center;line-height:1.3;opacity:.8}
-    .ticket-footer{background:linear-gradient(135deg,#0a1a40,#0d2454);border-radius:0 0 10px 10px;display:flex;justify-content:center;align-items:center;padding:9px 0 11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .ticket-number-badge{background:white;border-radius:8px;padding:5px 24px;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:#7a1a2a;letter-spacing:.15em;min-width:120px;text-align:center}
-    @media print{body{padding:10mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
-  </style>
-  </head><body>
-  <div style="position:fixed;top:10px;right:10px;z-index:9999;display:flex;gap:8px;print:none">
-    <button onclick="window.close()" style="padding:8px 16px;background:#0d2454;color:white;border:none;border-radius:6px;font-family:sans-serif;cursor:pointer">✕ Cerrar</button>
-    <button onclick="window.print()" style="padding:8px 16px;background:#d4a820;color:#0d2454;border:none;border-radius:6px;font-family:sans-serif;font-weight:700;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
-  </div>
-  ${ticketHTML}
-  </body></html>`;
+  const fullHTML = '<!DOCTYPE html><html lang="es"><head>' +
+    '<meta charset="UTF-8">' +
+    '<title>Boleto #' + numPad + ' — El Milagro</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=IM+Fell+English:ital@0;1&family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet">' +
+    '<style>\n    *{margin:0;padding:0;box-sizing:border-box}\n    body{background:white;padding:20mm;font-family:\'Crimson Pro\',serif;display:flex;justify-content:center}\n    .boleto-wrap{display:flex;flex-direction:column;align-items:stretch;width:100%;max-width:380px;filter:drop-shadow(0 4px 20px rgba(0,0,0,0.3))}\n    .stub{background:#1a3a7a;border-radius:12px 12px 0 0;padding:14px 24px 12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}\n    .stub-fields{display:flex;flex-direction:row;gap:10px;align-items:center}\n    .stub-field{display:flex;flex-direction:column;border-bottom:1px dotted rgba(255,255,255,0.2);padding:5px 0 3px}\n    .stub-field:last-child{border-bottom:none}\n    .stub-label{font-family:\'Playfair Display\',serif;font-size:.63rem;font-weight:700;color:#ffffff;letter-spacing:.07em}\n    .stub-value{font-family:\'Crimson Pro\',serif;font-size:.85rem;font-weight:600;color:#ffffff;min-height:15px}\n    .diamond-sep{background:#1a3a7a;width:100%;height:22px;display:flex;align-items:center;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}\n    .diamond-sep::after{content:\'\';display:block;width:100%;height:18px;background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'18\' height=\'18\'%3E%3Cellipse cx=\'9\' cy=\'9\' rx=\'7\' ry=\'5\' fill=\'%235c6b5c\'/%3E%3C/svg%3E");background-size:18px 18px;background-repeat:repeat-x;background-position:center}\n    .hc{position:absolute;width:14px;height:14px;background:#02040c;border-radius:50%;top:50%;transform:translateY(-50%);z-index:2}\n    .hc-l{left:-7px}.hc-r{right:-7px}\n    .ticket-body{background:#1e4a94;padding:14px 18px 12px;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}\n    .premio-mayor{text-align:center;padding-bottom:9px;margin-bottom:9px;border-bottom:1.5px solid rgba(255,255,255,.15)}\n    .pm-label{font-family:\'Playfair Display\',serif;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:#ffffff;opacity:.7;display:block;margin-bottom:2px}\n    .pm-value{font-family:\'Playfair Display\',serif;font-size:1.6rem;font-weight:900;color:#ffffff;line-height:1.05}\n    .pm-sub{font-family:\'IM Fell English\',serif;font-size:.58rem;font-style:italic;color:#ffffff;opacity:.65}\n    .ticket-layout{display:flex;align-items:stretch}\n    .ticket-title-col{display:flex;flex-direction:column;justify-content:center;padding-right:8px;border-right:1.5px solid rgba(255,255,255,.18);min-width:70px;max-width:78px}\n    .title-gran{font-family:\'Playfair Display\',serif;font-size:.75rem;font-weight:900;text-transform:uppercase;letter-spacing:.10em;color:#ffffff;line-height:1.15}\n    .title-el{font-family:\'Playfair Display\',serif;font-size:1.4rem;font-weight:900;font-style:italic;color:#ffffff;line-height:.9}\n    .anticipados{display:flex;flex:1}\n    .anticipado{flex:1;padding:3px 3px 3px 7px;display:flex;flex-direction:column;gap:1px;border-right:1px solid rgba(255,255,255,.12);min-width:0;overflow:hidden}\n    .anticipado:last-child{border-right:none}\n    .ant-label{font-family:\'Crimson Pro\',serif;font-size:.47rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#ffffff;line-height:1.2;white-space:nowrap}\n    .ant-prize{font-family:\'Playfair Display\',serif;font-size:.8rem;font-weight:900;color:#ffffff;line-height:1;white-space:nowrap}\n    .ant-sep{width:55%;height:2px;background:linear-gradient(90deg,#d4a820,#f5d060,#d4a820);margin:2px 0;border-radius:1px}\n    .ant-abono{font-family:\'Crimson Pro\',serif;font-size:.62rem;font-weight:700;color:#d4a820;margin-top:3px}\n    .ant-date{font-family:\'Crimson Pro\',serif;font-size:.55rem;font-weight:600;color:#ffffff;line-height:1.25}\n    .ticket-nota{margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12);font-family:\'IM Fell English\',serif;font-size:.5rem;font-style:italic;color:#ffffff;text-align:center;line-height:1.3;opacity:.8}\n    .ticket-footer{background:linear-gradient(135deg,#0a1a40,#0d2454);border-radius:0 0 10px 10px;display:flex;justify-content:center;align-items:center;padding:9px 0 11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}\n    .ticket-number-badge{background:white;border-radius:8px;padding:5px 24px;font-family:\'Playfair Display\',serif;font-size:1.6rem;font-weight:900;color:#7a1a2a;letter-spacing:.15em;min-width:120px;text-align:center}\n    @media print{body{padding:10mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}\n  </style>' +
+    '<style>@media print{.no-print{display:none!important}}</style>' +
+    '</head><body>' +
+    '<div class="no-print" style="position:fixed;top:10px;right:10px;z-index:9999;display:flex;gap:8px">' +
+    '<button onclick="window.close()" style="padding:8px 16px;background:#0d2454;color:white;border:none;border-radius:6px;font-family:sans-serif;cursor:pointer">✕ Cerrar</button>' +
+    '<button onclick="window.print()" style="padding:8px 16px;background:#d4a820;color:#0d2454;border:none;border-radius:6px;font-family:sans-serif;font-weight:700;cursor:pointer">🖨 Imprimir / PDF</button>' +
+    '</div>' +
+    ticketHTML +
+    '</body></html>';
 
-  const blob = new Blob([fullHTML], {type: 'text/html'});
+  const blob = new Blob([fullHTML], {type: 'text/html;charset=utf-8'});
   const url = URL.createObjectURL(blob);
-  const win = window.open(url, '_blank');
-  if(!win) {
-    // Fallback si popup bloqueado - descargar como archivo
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `boleto-${String(currentD).padStart(4,'0')}.html`;
-    a.click();
-  }
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'boleto-' + numPad + '.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('Boleto descargado — ábrelo en el navegador para imprimir','ok');
 }
 
+</script>
+
+<!-- TICKET MODAL -->
+<div class="ticket-modal-overlay" id="ticket-modal">
+  <div class="ticket-modal-box">
+    <div class="ticket-modal-header">
+      <h3>🎟 Boleto — <span id="ticket-modal-num"></span></h3>
+      <button onclick="closeTicketModal()" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <div id="ticket-preview-area"></div>
+    <div style="display:flex;gap:.75rem;margin-top:1rem">
+      <button class="btn btn-gold btn-full" onclick="downloadTicketPDF()">⬇ Descargar PDF</button>
+      <button class="btn btn-ghost btn-full" onclick="closeTicketModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
