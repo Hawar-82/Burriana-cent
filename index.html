@@ -3353,6 +3353,10 @@ function openNumDisponibles(){
 function closeNumDisponibles(){
   document.getElementById('modal-disponibles-overlay').style.display = 'none';
 }
+function filtrarDisponibles(q){
+  const filtered = q ? _allDisponibles.filter(n=>n.includes(q)) : _allDisponibles;
+  renderDisponibles(filtered);
+}
 
 function filterDisponibles(val){
   const q = val.trim();
@@ -3396,5 +3400,42 @@ function seleccionarDisponible(num){
 </script>
 
 
+
+<!-- MODAL NÚMEROS DISPONIBLES -->
+<div id="modal-disponibles-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)closeNumDisponibles()">
+  <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:500px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--gold)">Números Disponibles</div>
+        <div id="disp-count" style="font-size:.75rem;color:var(--text3);margin-top:.15rem"></div>
+      </div>
+      <button class="xbtn" onclick="closeNumDisponibles()">✕</button>
+    </div>
+    <div style="padding:.75rem 1rem;border-bottom:1px solid var(--border)">
+      <input type="text" id="disp-search" placeholder="Buscar número..." oninput="filtrarDisponibles(this.value)"
+        style="width:100%;background:var(--surface3);border:1.5px solid var(--border);color:var(--text);padding:.55rem .85rem;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.9rem;outline:none">
+    </div>
+    <div id="disp-list" style="padding:.75rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px;overflow-y:auto;flex:1;max-height:60vh"></div>
+  </div>
+</div>
+
+
+<!-- MODAL NÚMEROS DISPONIBLES -->
+<div id="modal-disponibles-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)closeNumDisponibles()">
+  <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:500px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--gold)">Números Disponibles</div>
+        <div id="disp-count" style="font-size:.75rem;color:var(--text3);margin-top:.15rem"></div>
+      </div>
+      <button class="xbtn" onclick="closeNumDisponibles()">✕</button>
+    </div>
+    <div style="padding:.75rem 1rem;border-bottom:1px solid var(--border)">
+      <input type="text" id="disp-search" placeholder="Buscar número..." oninput="filtrarDisponibles(this.value)"
+        style="width:100%;background:var(--surface3);border:1.5px solid var(--border);color:var(--text);padding:.55rem .85rem;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.9rem;outline:none">
+    </div>
+    <div id="disp-list" style="padding:.75rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px;overflow-y:auto;flex:1;max-height:60vh"></div>
+  </div>
+</div>
 </body>
 </html>
