@@ -136,7 +136,7 @@ header{height:56px;background:rgba(2,4,12,0.92);border-bottom:1px solid rgba(0,2
 .cr-chip{border-color:var(--red)!important;color:var(--red)!important;background:var(--red-dim)!important}
 .send{margin-left:auto} .send input{width:185px;font-size:.82rem;padding:.4rem .72rem}
 
-.ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:3px;margin-bottom:1.2rem}
+.ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:3px;margin-bottom:1.2rem;contain:content}
 .nc{aspect-ratio:1;border-radius:6px;border:1.5px solid transparent;display:flex;
   flex-direction:column;align-items:center;justify-content:center;cursor:pointer;
   transition:all .14s;position:relative;overflow:hidden}
@@ -576,7 +576,6 @@ tr:hover td{background:var(--surface2)}
 
 /* ══════════════════════════════════════════════════════════ */
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -1493,126 +1492,7 @@ function updateAbonoHint(inputId, hintId){
 const DEMO_MODE  = false;
 const DEMO_ADMIN = 'admin123';
 
-// Datos de muestra para que la demo se vea poblada
-let DEMO_DB = {
-  '0042': { name:'María García',    phone:'+34 611-0101', seller:'Ana López',   paid:true,  paymentClaim:false, abonos:100, abonosPending:0,  paymethod:'EB', date:'24/2/2026, 10:15', ts:1 },
-  '0117': { name:'Carlos Méndez',   phone:'+34 622-0202', seller:'Pedro Ruiz',  paid:false, paymentClaim:true,  abonos:0,   abonosPending:0,  paymethod:'DEF',     date:'24/2/2026, 10:32', ts:2 },
-  '0256': { name:'Laura Herrera',   phone:'+34 633-0303', seller:'Ana López',   paid:true,  paymentClaim:false, abonos:100, abonosPending:0,  paymethod:'EB', date:'24/2/2026, 11:00', ts:3 },
-  '0389': { name:'Jorge Ramírez',   phone:'+34 644-0404', seller:'Pedro Ruiz',  paid:false, paymentClaim:false, abonos:50,  abonosPending:0,  paymethod:'DEF',     date:'24/2/2026, 11:18', ts:4 },
-  '0501': { name:'Sofía Castillo',  phone:'+34 655-0505', seller:'Ana López',   paid:false, paymentClaim:false, abonos:30,  abonosPending:20, paymethod:'EB', date:'24/2/2026, 11:45', ts:5 },
-  '0777': { name:'Diego Morales',   phone:'+34 666-0606', seller:'Luis Torres', paid:true,  paymentClaim:false, abonos:100, abonosPending:0,  paymethod:'DEF',     date:'24/2/2026, 12:10', ts:6 },
-  '1234': { name:'Elena Vásquez',   phone:'+34 677-0707', seller:'Luis Torres', paid:false, paymentClaim:false, abonos:0,   abonosPending:40, paymethod:'',         date:'24/2/2026, 12:30', ts:7 },
-  '5000': { name:'Andrés Jiménez',  phone:'+34 688-0808', seller:'Ana López',   paid:true,  paymentClaim:false, abonos:100, abonosPending:0,  paymethod:'EB', date:'24/2/2026, 13:00', ts:8 },
-  '7321': { name:'Isabel Paredes',  phone:'+34 699-0909', seller:'Pedro Ruiz',  paid:false, paymentClaim:false, abonos:20,  abonosPending:0,  paymethod:'DEF',     date:'24/2/2026, 13:22', ts:9 },
-  '9999': { name:'Roberto Salinas', phone:'+34 600-1010', seller:'Luis Torres', paid:false, paymentClaim:true,  abonos:0,   abonosPending:50, paymethod:'',         date:'24/2/2026, 14:05', ts:10},
-};
 
-function demoPost(body) {
-  const { action, token, user, num, entry } = body;
-  const isAdmin = token === DEMO_ADMIN;
-
-  // Buscar colaborador: primero por user+pass, luego solo por pass (token guardado en sesión)
-  let sellerObj = null;
-  if (!isAdmin) {
-    if (user) {
-      sellerObj = SELLERS.find(s => s.user === user && s.pass === token);
-    }
-    if (!sellerObj) {
-      sellerObj = SELLERS.find(s => s.pass === token);
-    }
-  }
-  const isSeller = isAdmin || !!sellerObj;
-
-  if (action === 'ping_auth' || action === 'ping') {
-    if (isAdmin) return { ok:true, role:'admin', name:'Administrador' };
-    if (sellerObj) return { ok:true, role:'seller', name: sellerObj.name };
-    if (!token && !user) return { ok:true, role:'guest' };
-    return { ok:false, error:'Usuario o contraseña incorrectos' };
-  }
-
-  if (!isSeller) return { ok:false, error:'No autorizado' };
-  const padNum = num ? String(num).padStart(4,'0') : null;
-
-  if (action === 'register') {
-    if (DEMO_DB[padNum]) return { ok:false, error:`#${padNum} ya está vendido a ${DEMO_DB[padNum].name}` };
-    DEMO_DB[padNum] = { ...entry, ts: Date.now() };
-    return { ok:true };
-  }
-  if (action === 'edit') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador puede editar' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    DEMO_DB[padNum] = { ...DEMO_DB[padNum], ...entry };
-    return { ok:true };
-  }
-  if (action === 'reportPay') {
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    if (DEMO_DB[padNum].paid) return { ok:false, error:'Este número ya está pagado' };
-    DEMO_DB[padNum].paymentClaim = true;
-    return { ok:true };
-  }
-  if (action === 'confirmPay') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    DEMO_DB[padNum].paid = true; DEMO_DB[padNum].paymentClaim = false;
-    return { ok:true };
-  }
-  if (action === 'rejectPay') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    DEMO_DB[padNum].paid = false; DEMO_DB[padNum].paymentClaim = false;
-    return { ok:true };
-  }
-  if (action === 'togglePaid') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    const newPaid = !DEMO_DB[padNum].paid;
-    DEMO_DB[padNum].paid = newPaid; DEMO_DB[padNum].paymentClaim = false;
-    return { ok:true, paid:newPaid };
-  }
-  if (action === 'delete') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    delete DEMO_DB[padNum];
-    return { ok:true };
-  }
-  if (action === 'reportAbono') {
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    const val = Number(body.valor);
-    if (!val || val <= 0) return { ok:false, error:'Valor inválido' };
-    DEMO_DB[padNum].abonosPending = (DEMO_DB[padNum].abonosPending||0) + val;
-    return { ok:true };
-  }
-  if (action === 'confirmAbono') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    const val = DEMO_DB[padNum].abonosPending || 0;
-    DEMO_DB[padNum].abonos = (DEMO_DB[padNum].abonos||0) + val;
-    DEMO_DB[padNum].abonosPending = 0;
-    // Si abonos >= precio marcar como pagado
-    if (DEMO_DB[padNum].abonos >= TICKET) {
-      DEMO_DB[padNum].paid = true; DEMO_DB[padNum].paymentClaim = false;
-    }
-    return { ok:true };
-  }
-  if (action === 'rejectAbono') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    DEMO_DB[padNum].abonosPending = 0;
-    return { ok:true };
-  }
-  if (action === 'setAbono') {
-    if (!isAdmin) return { ok:false, error:'Solo el administrador' };
-    if (!DEMO_DB[padNum]) return { ok:false, error:'No encontrado' };
-    const val = Number(body.valor);
-    if (isNaN(val) || val < 0) return { ok:false, error:'Valor inválido' };
-    DEMO_DB[padNum].abonos = val;
-    DEMO_DB[padNum].abonosPending = 0;
-    if (val >= TICKET) { DEMO_DB[padNum].paid=true; DEMO_DB[padNum].paymentClaim=false; }
-    else DEMO_DB[padNum].paid = false;
-    return { ok:true };
-  }
-  return { ok:false, error:'Acción desconocida' };
-}
 
 // ── API CALLS (con interceptor demo) ──────────────────────
 // API functions replaced by Supabase direct calls above
@@ -1693,11 +1573,9 @@ function launchApp(){
     document.getElementById('hname-s').textContent = session.name;
   }
 
-  setInterval(()=>loadData(true), 45000);
+  setInterval(()=>loadData(true), 180000);
   isOnline = navigator.onLine;
   updateOfflineBanner();
-  if(isOnline && queueSize() > 0) flushQueue();
-  setTimeout(checkAutoBackup, 4000);
 }
 
 function logout(){
@@ -2092,29 +1970,33 @@ function gridItems(){
   return nums;
 }
 
+let _gridRenderPending = false;
 function renderGrid(){
-  const items=gridItems();
-  const grid=document.getElementById('ngrid');
-  // Batch render with innerHTML for 10x better performance
-  const html = items.map(num=>{
-    const e=DATA[num];
-    let cls,lbl;
-    if(!e)                          { cls='nc free';    lbl='libre'; }
-    else if(e.paid)                 { cls='nc paid';    lbl='pagado'; }
-    else if(e.paymentClaim)         { cls='nc claimed'; lbl='reportado'; }
-    else if((e.abonos||0)>0)        { cls='nc abonado'; lbl='abonado'; }
-    else                            { cls='nc unpaid';  lbl='pendiente'; }
-    return `<div class="${cls}" data-num="${num}"><span class="n">${num}</span><span class="s">${lbl}</span>${e?'<div class="pdot"></div>':''}</div>`;
-  }).join('');
-  grid.innerHTML = html;
-  // Attach events via delegation (one listener instead of 10000)
-  grid.onclick = (ev) => {
-    const cell = ev.target.closest('.nc');
-    if(!cell) return;
-    const num = cell.dataset.num;
-    if(DATA[num]) openD(num); else openR(num);
-  };
-  document.getElementById('pgrid').innerHTML='';
+  if(_gridRenderPending) return;
+  _gridRenderPending = true;
+  requestAnimationFrame(() => {
+    _gridRenderPending = false;
+    const items = gridItems();
+    const grid = document.getElementById('ngrid');
+    const html = items.map(num => {
+      const e = DATA[num];
+      let cls;
+      if(!e)                       cls='nc free';
+      else if(e.paid)              cls='nc paid';
+      else if(e.paymentClaim)      cls='nc claimed';
+      else if((e.abonos||0)>0)     cls='nc abonado';
+      else                         cls='nc unpaid';
+      return '<div class="' + cls + '" data-num="' + num + '"><span class="n">' + num + '</span>' + (e?'<div class="pdot"></div>':'') + '</div>';
+    }).join('');
+    grid.innerHTML = html;
+    grid.onclick = (ev) => {
+      const cell = ev.target.closest('.nc');
+      if(!cell) return;
+      const num = cell.dataset.num;
+      if(DATA[num]) openD(num); else openR(num);
+    };
+    document.getElementById('pgrid').innerHTML = '';
+  });
 }
 
 function renderPg(id,pages,total){
@@ -3164,52 +3046,11 @@ function clearChangelog(){
 // ══════════════════════════════════════════════════════════
 // ── PROTECCIÓN 2: MODO OFFLINE + COLA DE SINCRONIZACIÓN ───
 // ══════════════════════════════════════════════════════════
-const QUEUE_KEY  = 'rifa_offline_queue';
-let isOnline     = navigator.onLine;
 
-function getQueue(){ try{ return JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }catch(e){return[];} }
-function saveQueue(q){ localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
-function queueSize(){ return getQueue().length; }
+window.addEventListener('online',  ()=>{ isOnline=true;  setDot('on'); });
+window.addEventListener('offline', ()=>{ isOnline=false; setDot('off'); toast('Sin conexión','err'); });
 
-function updateOfflineBanner(){
-  const banner = document.getElementById('offline-banner');
-  const qc     = document.getElementById('offline-queue-count');
-  if(!isOnline){
-    const n = queueSize();
-    qc.textContent = n > 0 ? `(${n} pendiente${n!==1?'s':''})` : '';
-    banner.classList.add('show');
-  } else {
-    banner.classList.remove('show');
-  }
-}
-
-window.addEventListener('online',  async ()=>{ isOnline=true;  updateOfflineBanner(); await flushQueue(); });
-window.addEventListener('offline', ()=>{ isOnline=false; updateOfflineBanner(); });
-
-async function flushQueue(){ /* Supabase maneja conectividad */ }
-async function apiPostSafe(payload, logArgs=null){ return { ok:true }; }
-
-// ══════════════════════════════════════════════════════════
-// ── PROTECCIÓN 3: BACKUP AUTOMÁTICO DIARIO ────────────────
-// ══════════════════════════════════════════════════════════
-const BACKUP_KEY = 'rifa_last_backup';
-
-function checkAutoBackup(){
-  if(session?.role !== 'admin') return;
-  const last = localStorage.getItem(BACKUP_KEY);
-  const hoy  = new Date().toDateString();
-  if(last === hoy) return; // ya se hizo hoy
-  // Mostrar aviso no intrusivo a los 3 segundos de entrar
-  setTimeout(()=>{
-    const n = Object.keys(DATA).length;
-    if(n === 0) return;
-    toast(`💾 Recuerda hacer backup diario (${n} registros)`, 'ok', 6000);
-    // Programar descarga automática si hay datos
-    if(n > 0) triggerAutoBackup();
-  }, 3000);
-}
-
-function triggerAutoBackup(){
+async function triggerAutoBackup(){
   const hoy = new Date().toDateString();
   localStorage.setItem(BACKUP_KEY, hoy);
   exportCSV(/*auto=*/true);
@@ -3225,170 +3066,85 @@ function exportMisPDF(){
     .filter(([,e]) => e.seller === sellerName)
     .sort((a,b) => a[0].localeCompare(b[0]));
 
-  if(!misNumeros.length){
-    toast('No tienes números registrados','err');
-    return;
-  }
+  if(!misNumeros.length){ toast('No tienes números registrados','err'); return; }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW = 210;
-  const margin = 12;
-
-  // ── Header ──
-  doc.setFillColor(13, 14, 20);
-  doc.rect(0, 0, pageW, 28, 'F');
-  doc.setTextColor(240, 184, 64);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('El Milagro', margin, 11);
-  doc.setTextColor(180, 180, 200);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Informe de ventas — ' + sellerName, margin, 18);
-  doc.text(new Date().toLocaleDateString('es', {day:'2-digit',month:'2-digit',year:'numeric'}), pageW - margin, 18, { align: 'right' });
-
-  // ── Stats ──
   const totalReservados = misNumeros.length;
   const totalPagados    = misNumeros.filter(([,e]) => e.paid).length;
-  const totalAbonado    = misNumeros.reduce((s,[,e]) => s + (e.abonos||0), 0);
-  const totalPendiente  = misNumeros.reduce((s,[,e]) => s + Math.max(0, TICKET - (e.abonos||0) - (e.abonosPending||0)), 0);
+  const totalAbonado    = misNumeros.reduce((s,[,e]) => s+(e.abonos||0), 0);
+  const totalPendiente  = misNumeros.reduce((s,[,e]) => s+Math.max(0,TICKET-(e.abonos||0)-(e.abonosPending||0)), 0);
 
-  doc.setTextColor(0);
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'normal');
-  let sy = 36;
-  const stats = [
-    ['Números reservados', totalReservados],
-    ['Pagados completos',  totalPagados],
-    ['Total abonado',      fmt(totalAbonado)],
-    ['Saldo pendiente',    fmt(totalPendiente)],
-  ];
-  stats.forEach(([label, val], i) => {
-    const x = margin + (i % 2) * 90;
-    const y = sy + Math.floor(i / 2) * 8;
-    doc.setFont('helvetica', 'bold');
-    doc.text(String(val), x + 55, y, { align: 'right' });
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    doc.text(label, x, y);
-    doc.setTextColor(0);
-  });
+  const rows = misNumeros.map(([num,e]) => {
+    const abonado = e.abonos||0;
+    const saldo   = Math.max(0, TICKET - abonado - (e.abonosPending||0));
+    const estado  = e.paid ? '<span style="color:#1a7a3a">Pagado</span>' :
+                    e.paymentClaim ? '<span style="color:#c09020">Reportado</span>' :
+                    abonado > 0 ? '<span style="color:#1a5a8a">Abonado</span>' :
+                    '<span style="color:#c04040">Pendiente</span>';
+    const name = e.name.length > 30 ? e.name.substring(0,28)+'…' : e.name;
+    return '<tr><td>#'+num+'</td><td>'+name+'</td><td>'+fmt(abonado)+'</td><td>'+estado+'</td><td>'+(saldo>0?fmt(saldo):'✓')+'</td></tr>';
+  }).join('');
 
-  // ── Table ──
-  let y = sy + 20;
-  const cols = { num: margin, name: margin+16, abono: margin+110, estado: margin+130, saldo: margin+158 };
-  const rowH = 7;
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Informe '+sellerName+'</title>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:12mm;font-size:12px}' +
+    'h2{text-align:center;margin-bottom:4px;font-size:16px}p{text-align:center;color:#666;margin-bottom:8px}' +
+    '.stats{display:flex;gap:20px;justify-content:center;margin-bottom:12px;flex-wrap:wrap}' +
+    '.stat{background:#f5f5f5;padding:6px 14px;border-radius:6px;text-align:center}' +
+    '.stat b{display:block;font-size:16px;color:#1a3a7a}' +
+    'table{border-collapse:collapse;width:100%}' +
+    'th{background:#1a3a7a;color:white;padding:6px 8px;text-align:left;font-size:11px}' +
+    'td{border-bottom:1px solid #eee;padding:5px 8px}' +
+    'tr:nth-child(even){background:#f9f9f9}' +
+    '@media print{body{padding:8mm}}</style></head><body>' +
+    '<h2>El Milagro — Informe de '+sellerName+'</h2>' +
+    '<p>Generado el '+new Date().toLocaleDateString('es')+'</p>' +
+    '<div class="stats">' +
+    '<div class="stat"><b>'+totalReservados+'</b>Reservados</div>' +
+    '<div class="stat"><b>'+totalPagados+'</b>Pagados</div>' +
+    '<div class="stat"><b>'+fmt(totalAbonado)+'</b>Abonado</div>' +
+    '<div class="stat"><b>'+fmt(totalPendiente)+'</b>Pendiente</div>' +
+    '</div>' +
+    '<table><tr><th>#</th><th>Comprador</th><th>Abonado</th><th>Estado</th><th>Saldo</th></tr>' +
+    rows + '</table></body></html>';
 
-  // Header row
-  doc.setFillColor(240, 184, 64);
-  doc.rect(margin, y-5, pageW - margin*2, rowH, 'F');
-  doc.setTextColor(13, 14, 20);
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'bold');
-  doc.text('#', cols.num, y);
-  doc.text('Nombre comprador', cols.name, y);
-  doc.text('Abonado', cols.abono, y);
-  doc.text('Estado', cols.estado, y);
-  doc.text('Saldo', cols.saldo, y);
-  y += rowH;
-
-  // Data rows
-  doc.setFont('helvetica', 'normal');
-  misNumeros.forEach(([num, e], idx) => {
-    if(y > 275) {
-      doc.addPage();
-      y = 20;
-    }
-    // Alternate row background
-    if(idx % 2 === 0){
-      doc.setFillColor(245, 245, 252);
-      doc.rect(margin, y-5, pageW - margin*2, rowH, 'F');
-    }
-    const abonado  = e.abonos || 0;
-    const saldo    = Math.max(0, TICKET - abonado - (e.abonosPending||0));
-    const estado   = e.paid ? 'Pagado' : e.paymentClaim ? 'Reportado' : abonado > 0 ? 'Abonado' : 'Pendiente';
-    const estadoColor = e.paid ? [40, 160, 80] : e.paymentClaim ? [200, 140, 0] : abonado > 0 ? [60, 120, 200] : [180, 60, 60];
-
-    doc.setTextColor(0);
-    doc.setFontSize(7.5);
-    doc.text('#' + num, cols.num, y);
-    // Truncate long names
-    const nameStr = e.name.length > 35 ? e.name.substring(0, 33) + '…' : e.name;
-    doc.text(nameStr, cols.name, y);
-    doc.text(fmt(abonado), cols.abono + 15, y, { align: 'right' });
-    doc.setTextColor(...estadoColor);
-    doc.text(estado, cols.estado, y);
-    doc.setTextColor(saldo > 0 ? 180 : 40, saldo > 0 ? 60 : 160, saldo > 0 ? 60 : 80);
-    doc.text(saldo > 0 ? fmt(saldo) : '✓', cols.saldo + 15, y, { align: 'right' });
-    y += rowH;
-  });
-
-  // Footer line
-  doc.setDrawColor(200);
-  doc.line(margin, y+2, pageW-margin, y+2);
-  doc.setTextColor(120);
-  doc.setFontSize(7);
-  doc.text('El Milagro · Informe generado el ' + new Date().toLocaleString('es'), pageW/2, y+7, { align: 'center' });
-
-  doc.save(`informe-${sellerName.replace(/\s+/g,'-').toLowerCase()}.pdf`);
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='informe-'+sellerName.replace(/\s+/g,'-').toLowerCase()+'.html';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast('Informe descargado','ok');
 }
 
 function exportLibresPDF(){
   const ocupados = new Set(Object.keys(DATA));
   const libres = [];
-  for(let i = 1; i <= 10000; i++){
-    const n = String(i).padStart(4,'0');
+  for(let i=1;i<=10000;i++){
+    const n=String(i).padStart(4,'0');
     if(!ocupados.has(n)) libres.push(n);
   }
+  if(!libres.length){ toast('No hay números libres','err'); return; }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  // Generate printable HTML with 10 columns
+  const rows = [];
+  for(let i=0;i<libres.length;i+=10){
+    rows.push('<tr>' + libres.slice(i,i+10).map(n=>`<td>${n}</td>`).join('') + '</tr>');
+  }
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Números Libres</title>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:15mm}' +
+    'h2{text-align:center;margin-bottom:4px}p{text-align:center;color:#666;margin-bottom:12px;font-size:12px}' +
+    'table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:5px;text-align:center;font-family:monospace;font-size:12px}' +
+    '@media print{body{padding:8mm}}</style></head><body>' +
+    '<h2>El Milagro — Números Libres</h2>' +
+    '<p>' + libres.length + ' disponibles · ' + new Date().toLocaleDateString('es') + '</p>' +
+    '<table>' + rows.join('') + '</table></body></html>';
 
-  const pageW = 210;
-  const marginX = 12;
-  const marginY = 15;
-  const cols = 10;
-  const colW = (pageW - marginX * 2) / cols;
-  const rowH = 7;
-  const fontSize = 8;
-
-  // Header
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('El Milagro — Números Libres', pageW / 2, marginY, { align: 'center' });
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100);
-  doc.text(`${libres.length} números disponibles · ${new Date().toLocaleDateString('es')}`, pageW / 2, marginY + 6, { align: 'center' });
-  doc.setTextColor(0);
-
-  let x = marginX;
-  let y = marginY + 14;
-  doc.setFontSize(fontSize);
-  doc.setFont('courier', 'normal');
-
-  libres.forEach((num, idx) => {
-    // Border
-    doc.setDrawColor(200);
-    doc.rect(x, y - rowH + 2, colW, rowH, 'S');
-    // Text centered in cell
-    doc.text(num, x + colW / 2, y - 1, { align: 'center' });
-
-    if((idx + 1) % cols === 0){
-      x = marginX;
-      y += rowH;
-      // New page if needed
-      if(y > 282){
-        doc.addPage();
-        y = marginY;
-      }
-    } else {
-      x += colW;
-    }
-  });
-
-  doc.save('numeros-libres-elmilagro.pdf');
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='numeros-libres.html';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast('Descargado — ábrelo e imprime como PDF','ok');
 }
 
 function exportCSV(auto=false){
@@ -3551,27 +3307,26 @@ window.addEventListener('load', () => {
   }
 
   msg.textContent = 'Conectando…';
-  fetch(`${SUPABASE_URL}/rest/v1/ventas?limit=1`, { headers })
+
+  // Timeout de 8 segundos - si no responde, igual muestra el login
+  const connectTimeout = setTimeout(() => {
+    splash.style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }, 8000);
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 7000);
+
+  fetch(`${SUPABASE_URL}/rest/v1/ventas?limit=1`, { headers, signal: controller.signal })
     .then(r => {
-      if(r.ok){
-        splash.style.display = 'none';
-        document.getElementById('login-screen').style.display = 'flex';
-      } else throw new Error();
+      clearTimeout(connectTimeout);
+      splash.style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
     }).catch(() => {
-      msg.textContent = '';
-      splash.innerHTML = `
-        <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800">
-          <span style="color:var(--gold)">El Milagro</span>
-        </div>
-        <div style="color:var(--red);font-size:.88rem;max-width:300px;text-align:center;line-height:1.7">
-          ⚠️ No se puede conectar<br>
-          <span style="color:var(--text3);font-size:.8rem">Verifica tu conexión a internet</span>
-        </div>
-        <button onclick="location.reload()" style="margin-top:.5rem;padding:.5rem 1.2rem;
-          background:var(--gold);color:#0d0e14;border:none;border-radius:8px;
-          font-family:'Outfit',sans-serif;font-weight:600;cursor:pointer">
-          Reintentar
-        </button>`;
+      clearTimeout(connectTimeout);
+      // Si falla, igual permitir entrar (Supabase puede estar lento)
+      splash.style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
     });
 });
 
