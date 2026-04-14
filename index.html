@@ -754,6 +754,7 @@ tr:hover td{background:var(--surface2)}
           <button type="button" class="pay-method-btn" id="sfpm-none"     onclick="setPayMethod('none','sf')"    >— Sin especificar</button>
           <button type="button" class="pay-method-btn" id="sfpm-DEF"     onclick="setPayMethod('DEF','sf')"    >💵 DEF</button>
           <button type="button" class="pay-method-btn" id="sfpm-EB" onclick="setPayMethod('EB','sf')">🏦 EB</button>
+            <button type="button" class="pay-method-btn" id="sfpm-BONO" onclick="setPayMethod('BONO','sf')">🎁 Bono</button>
         </div>
         <input type="hidden" id="sfpaymethod" value="">
       </div>
@@ -895,8 +896,12 @@ tr:hover td{background:var(--surface2)}
             <span class="fr-val" id="fp-abonos" style="color:var(--green)">0</span>
           </div>
           <div class="finance-row" style="font-weight:700;font-size:.92rem">
-            <span class="fr-label" style="color:var(--text)">Total</span>
+            <span class="fr-label" style="color:var(--text)">Total recaudado</span>
             <span class="fr-val"   id="fp-total" style="color:var(--gold);font-size:1rem">0</span>
+          </div>
+          <div class="finance-row">
+            <span class="fr-label" style="color:var(--blue)">🎁 Bonos (no monetarios)</span>
+            <span class="fr-val"   id="fp-bono" style="color:var(--blue)">0 números</span>
           </div>
           <div class="finance-row">
             <span class="fr-label" style="color:#c09020">🕐 Pendiente de cobrar</span>
@@ -983,6 +988,7 @@ tr:hover td{background:var(--surface2)}
             <button type="button" class="pay-method-btn" id="fpm-none"  onclick="setPayMethod('none','f')" >— Sin especificar</button>
             <button type="button" class="pay-method-btn" id="fpm-DEF"  onclick="setPayMethod('DEF','f')" >💵 DEF</button>
             <button type="button" class="pay-method-btn" id="fpm-EB" onclick="setPayMethod('EB','f')">🏦 EB</button>
+            <button type="button" class="pay-method-btn" id="fpm-BONO" onclick="setPayMethod('BONO','f')">🎁 Bono</button>
           </div>
           <input type="hidden" id="fpaymethod" value="">
         </div>
@@ -1053,6 +1059,7 @@ tr:hover td{background:var(--surface2)}
           <button class="chip on"  data-gf="all"     onclick="setGF('all',this)">Todos</button>
           <button class="chip"     data-gf="free"    onclick="setGF('free',this)">Disponibles</button>
           <button class="chip"     data-gf="sold"    onclick="setGF('sold',this)">Reservados</button>
+          <button class="chip"     data-gf="bono"    onclick="setGF('bono',this)">🎁 Bonos</button>
           <button class="chip"     data-gf="paid"    onclick="setGF('paid',this)">Pagados</button>
           <button class="chip"     data-gf="abonado" onclick="setGF('abonado',this)">💰 Abonado</button>
           <button class="chip"     data-gf="claimed" onclick="setGF('claimed',this)">Pago reportado</button>
@@ -1123,6 +1130,7 @@ tr:hover td{background:var(--surface2)}
         <button type="button" class="pay-method-btn" id="epm-none"     onclick="setPayMethod('none','e')"    >— Sin especificar</button>
         <button type="button" class="pay-method-btn" id="epm-DEF"     onclick="setPayMethod('DEF','e')"    >💵 DEF</button>
         <button type="button" class="pay-method-btn" id="epm-EB" onclick="setPayMethod('EB','e')">🏦 EB</button>
+            <button type="button" class="pay-method-btn" id="epm-BONO" onclick="setPayMethod('BONO','e')">🎁 Bono</button>
       </div>
       <input type="hidden" id="epaymethod" value="">
     </div>
@@ -1180,6 +1188,7 @@ tr:hover td{background:var(--surface2)}
         <button type="button" class="pay-method-btn" id="rpm-none"     onclick="setPayMethod('none','r')"    >— Sin especificar</button>
         <button type="button" class="pay-method-btn" id="rpm-DEF"     onclick="setPayMethod('DEF','r')"    >💵 DEF</button>
         <button type="button" class="pay-method-btn" id="rpm-EB" onclick="setPayMethod('EB','r')">🏦 EB</button>
+            <button type="button" class="pay-method-btn" id="rpm-BONO" onclick="setPayMethod('BONO','r')">🎁 Bono</button>
       </div>
       <input type="hidden" id="rpaymethod" value="">
     </div>
@@ -1871,6 +1880,7 @@ function updateStats(){
   const vals=Object.values(DATA);
   const sold    = vals.length;
   const paid    = vals.filter(e=>e.paid).length;
+  const bono    = vals.filter(e=>e.paid && e.paymethod==='BONO').length;
   const claimed = vals.filter(e=>e.paymentClaim && !e.paid).length;
   const abonado = vals.filter(e=>!e.paid && (e.abonos||0)>0).length;
   const unpaid  = sold - paid - claimed;
@@ -1930,8 +1940,11 @@ function updateStats(){
     }
 
     // ── Panel financiero ──
-    const totalConfirmed = vals.filter(e=>e.paid).length * TICKET;
-    const totalAbonos    = vals.reduce((s,e)=>s+(e.paid?0:(e.abonos||0)),0);
+    const pagosBono      = vals.filter(e=>e.paid && e.paymethod==='BONO');
+    const pagosReales    = vals.filter(e=>e.paid && e.paymethod!=='BONO');
+    const totalBonos     = pagosBono.length;
+    const totalConfirmed = pagosReales.length * TICKET;
+    const totalAbonos    = vals.reduce((s,e)=>s+(e.paid||e.paymethod==='BONO'?0:(e.abonos||0)),0);
     const totalRecaudado = totalConfirmed + totalAbonos;
     const totalPending   = vals.reduce((s,e)=>{
       if(e.paid) return s;
@@ -1945,6 +1958,7 @@ function updateStats(){
     setT('fp-confirmed', fmtE(totalConfirmed));
     setT('fp-abonos',    fmtE(totalAbonos));
     setT('fp-total',     fmtE(totalRecaudado));
+    setT('fp-bono',      totalBonos + ' número' + (totalBonos!==1?'s':''));
     setT('fp-pending',   fmtE(totalPending));
     setT('fp-goal',      fmtE(goal));
     setT('fp-pct',       pct + '%');
@@ -1963,6 +1977,7 @@ function gridItems(){
   if(gFilter==='sold')    nums=nums.filter(n=>DATA[n]);
   if(gFilter==='free')    nums=nums.filter(n=>!DATA[n]);
   if(gFilter==='paid')    nums=nums.filter(n=>DATA[n]&&DATA[n].paid);
+  if(gFilter==='bono')    nums=nums.filter(n=>DATA[n]&&DATA[n].paymethod==='BONO');
   if(gFilter==='claimed') nums=nums.filter(n=>DATA[n]&&DATA[n].paymentClaim&&!DATA[n].paid);
   if(gFilter==='unpaid')  nums=nums.filter(n=>DATA[n]&&!DATA[n].paid&&!DATA[n].paymentClaim);
   if(gFilter==='abonado') nums=nums.filter(n=>DATA[n]&&!DATA[n].paid&&(DATA[n].abonos||0)>0);
@@ -2035,6 +2050,7 @@ function renderTable(){
   const q=document.getElementById('ts').value.toLowerCase();
   let rows=Object.entries(DATA);
   if(tFilter==='paid')    rows=rows.filter(([,e])=>e.paid);
+  if(tFilter==='bono')    rows=rows.filter(([,e])=>e.paymethod==='BONO');
   if(tFilter==='claimed') rows=rows.filter(([,e])=>e.paymentClaim&&!e.paid);
   if(tFilter==='unpaid')  rows=rows.filter(([,e])=>!e.paid&&!e.paymentClaim);
   if(tFilter==='abonado') rows=rows.filter(([,e])=>!e.paid&&(e.abonos||0)>0);
@@ -2083,9 +2099,25 @@ function renderTable(){
         } else {
           const pb=document.createElement('button');
           pb.className=e.paid?'btn btn-ghost btn-sm':'btn btn-green btn-sm';
-          pb.textContent=e.paid?'↩':'✓'; pb.title=e.paid?'Desmarcar':'Marcar pagado';
+          pb.textContent=e.paid?'↩ Desmarcar':'✓ Pagado'; pb.title=e.paid?'Desmarcar pago':'Marcar pagado';
           pb.onclick=()=>togglePaid(num);
           ac.appendChild(pb);
+          // Botón convertir a Bono (solo admin, solo si está pagado)
+          if(session && session.role==='admin' && e.paid && e.paymethod!=='BONO'){
+            const bb=document.createElement('button');
+            bb.className='btn btn-sm'; bb.style.cssText='background:rgba(180,79,255,0.15);border:1px solid rgba(180,79,255,0.4);color:#b44fff';
+            bb.textContent='🎁 Marcar Bono'; bb.title='Convertir a pago Bono (no monetario)';
+            bb.onclick=async()=>{ await marcarBono(num); closeD(); await loadData(true); };
+            ac.appendChild(bb);
+          }
+          // Botón convertir Bono a pago real (si ya es bono)
+          if(session && session.role==='admin' && e.paid && e.paymethod==='BONO'){
+            const rb=document.createElement('button');
+            rb.className='btn btn-sm'; rb.style.cssText='background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff';
+            rb.textContent='💵 Cambiar a Pago'; rb.title='Convertir de Bono a pago real';
+            rb.onclick=async()=>{ await quitarBono(num); closeD(); await loadData(true); };
+            ac.appendChild(rb);
+          }
         }
         const db=document.createElement('button');
         db.className='btn btn-red btn-sm'; db.textContent='🗑'; db.onclick=()=>confirmDel(num);
@@ -2393,7 +2425,7 @@ async function rejectPay(num){
 
 // ── MÉTODO DE PAGO ────────────────────────────────────────
 function setPayMethod(val, prefix){
-  ['none','DEF','EB'].forEach(k=>{
+  ['none','DEF','EB','BONO'].forEach(k=>{
     const btn = document.getElementById(`${prefix}pm-${k}`);
     if(btn) btn.classList.toggle('on', k===val);
   });
@@ -2472,6 +2504,18 @@ async function togglePaid(num){
   if(r.ok){logChange('togglePaid',num,DATA[num],newPaid?'→ pagado':'→ pendiente');toast(`#${num} → ${newPaid?'pagado':'pendiente'}`,newPaid?'ok':'');await loadData(true);}
   else toast('Error','err');
 }
+async function marcarBono(num){
+  const r = await updateTicket(num, { paymethod:'BONO', paid:true });
+  if(r && r.ok) toast('Número #'+num+' marcado como Bono','ok');
+  else toast('Error al actualizar','err');
+}
+
+async function quitarBono(num){
+  const r = await updateTicket(num, { paymethod:'DEF' });
+  if(r && r.ok) toast('Número #'+num+' cambiado a pago real','ok');
+  else toast('Error al actualizar','err');
+}
+
 
 // ── DELETE WITH DOUBLE CONFIRM ────────────────────────────
 let delPendingNum = null;
