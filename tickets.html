@@ -6,6 +6,8 @@
 <title>Generador de Boletos — El Milagro</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Outfit:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=IM+Fell+English:ital@0;1&family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 * { margin:0;padding:0;box-sizing:border-box }
 :root {
@@ -265,7 +267,7 @@ input:focus { border-color:var(--cyan); background:rgba(0,212,255,0.08) }
   <button class="btn btn-primary" onclick="generarBoleto()">🎟 Generar Boleto</button>
   <div style="display:flex;gap:.75rem;margin-top:.75rem">
     <button class="btn btn-secondary" style="flex:1" onclick="window.print()">🖨 Imprimir / PDF</button>
-    <button class="btn btn-secondary" style="flex:1" onclick="descargarHTML()">⬇ Descargar HTML</button>
+    <button class="btn btn-secondary" style="flex:1" onclick="descargarPDF()" class="btn-download">📄 Descargar PDF</button>
   </div>
   <div id="msg" style="margin-top:.75rem;font-size:.82rem;color:var(--text3);text-align:center"></div>
 </div>
@@ -410,16 +412,58 @@ async function generarBoleto() {
   document.getElementById('msg').textContent = '✅ Boleto generado — usa Imprimir o Descargar';
 }
 
-function descargarHTML() {
+async function descargarPDF() {
   const area = document.getElementById('boleto-area');
   if(!area.innerHTML.trim()) { alert('Genera un boleto primero'); return; }
-  const numVal = document.getElementById('inp-num').value || 'boleto';
-  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'boleto-' + String(numVal).padStart(4,'0') + '.html';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
+  const numVal = document.getElementById('inp-num').value || '0000';
+  const numPad = String(numVal).padStart(4,'0');
+
+  const btn = document.querySelector('.btn-download');
+  if(btn) { btn.textContent = '⏳ Generando PDF...'; btn.disabled = true; }
+
+  try {
+    // Capture boleto as image
+    const canvas = await html2canvas(area.firstElementChild, {
+      scale: 3,
+      useCORS: true,
+      backgroundColor: null,
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const { jsPDF } = window.jspdf;
+
+    // A4 portrait
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210;
+    const pageH = 297;
+
+    // Calculate ticket dimensions to fit centered on A4
+    const imgW = canvas.width;
+    const imgH = canvas.height;
+    const ratio = imgW / imgH;
+
+    const maxW = 160; // max width in mm
+    const maxH = 240; // max height in mm
+
+    let ticketW = maxW;
+    let ticketH = ticketW / ratio;
+    if(ticketH > maxH) {
+      ticketH = maxH;
+      ticketW = ticketH * ratio;
+    }
+
+    const x = (pageW - ticketW) / 2;
+    const y = (pageH - ticketH) / 2;
+
+    pdf.addImage(imgData, 'JPEG', x, y, ticketW, ticketH);
+    pdf.save('boleto-' + numPad + '.pdf');
+
+  } catch(e) {
+    alert('Error generando PDF: ' + e.message);
+  } finally {
+    if(btn) { btn.textContent = '📄 Descargar PDF'; btn.disabled = false; }
+  }
 }
 </script>
 </body>
