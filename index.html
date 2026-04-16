@@ -2314,9 +2314,10 @@ function openD(num){
     <div class="drow"><span class="dk">Colaborador</span><span class="dv">${e.seller}</span></div>
     <div class="drow"><span class="dk">Estado</span><span class="dv">${stateBadge}</span></div>
     <div class="drow"><span class="dk">Método pago</span><span class="dv">${
-      e.paymethod==='DEF'     ? '💵 DEF' :
-      e.paymethod==='EB' ? '🏦 EB' :
-                                 '<span style="color:var(--text3)">— Sin especificar</span>'
+      e.paymethod==='DEF'  ? '💵 DEF' :
+      e.paymethod==='EB'   ? '🏦 EB' :
+      e.paymethod==='BONO' ? '🎁 Bono (regalo)' :
+                             '<span style="color:var(--text3)">— Sin especificar</span>'
     }</span></div>
     ${e.paymentClaim&&!e.paid?`<div style="background:rgba(240,184,64,0.08);border:1px solid rgba(240,184,64,0.25);border-radius:8px;padding:.6rem .85rem;font-size:.8rem;color:#c09020;margin-top:.5rem">
       ⚠️ El colaborador reportó este pago — pendiente de confirmación por el administrador</div>`:''}
