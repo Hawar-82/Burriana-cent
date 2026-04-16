@@ -754,7 +754,7 @@ tr:hover td{background:var(--surface2)}
           <button type="button" class="pay-method-btn" id="sfpm-none"     onclick="setPayMethod('none','sf')"    >— Sin especificar</button>
           <button type="button" class="pay-method-btn" id="sfpm-DEF"     onclick="setPayMethod('DEF','sf')"    >💵 DEF</button>
           <button type="button" class="pay-method-btn" id="sfpm-EB" onclick="setPayMethod('EB','sf')">🏦 EB</button>
-            <button type="button" class="pay-method-btn" id="sfpm-BONO" onclick="setPayMethod('BONO','sf')">🎁 Bono</button>
+
         </div>
         <input type="hidden" id="sfpaymethod" value="">
       </div>
@@ -1781,8 +1781,10 @@ function openSD(num){
   }
   document.getElementById('sd-saldo').textContent = e.paid ? '—' : fmt(saldo);
   document.getElementById('sd-metodo').textContent =
-    e.paymethod==='DEF' ? '💵 DEF'
-    : e.paymethod==='EB' ? '🏦 EB' : '— Sin especificar';
+    e.paymethod==='DEF'  ? '💵 DEF'
+    : e.paymethod==='EB'   ? '🏦 EB'
+    : e.paymethod==='BONO' ? '🎁 Bono (regalo)'
+    : '— Sin especificar';
 
   // Aviso abono pendiente
   document.getElementById('sd-pending-notice').style.display = pending > 0 ? '' : 'none';
