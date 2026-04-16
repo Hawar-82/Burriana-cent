@@ -2107,7 +2107,18 @@ function renderTable(){
             const bb=document.createElement('button');
             bb.className='btn btn-sm'; bb.style.cssText='background:rgba(180,79,255,0.15);border:1px solid rgba(180,79,255,0.4);color:#b44fff';
             bb.textContent='🎁 Marcar Bono'; bb.title='Convertir a pago Bono (no monetario)';
-            bb.onclick=async()=>{ await marcarBono(num); closeD(); await loadData(true); };
+            bb.onclick=async()=>{ 
+              bb.disabled=true; bb.textContent='⏳';
+              const r = await marcarBono(num);
+              if(r) { 
+                DATA[num].paymethod='BONO'; 
+                DATA[num].paid=true;
+                closeD(); 
+                renderCurrent(); 
+                updateStats();
+              }
+              bb.disabled=false;
+            };
             ac.appendChild(bb);
           }
           // Botón convertir Bono a pago real (si ya es bono)
@@ -2115,7 +2126,17 @@ function renderTable(){
             const rb=document.createElement('button');
             rb.className='btn btn-sm'; rb.style.cssText='background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff';
             rb.textContent='💵 Cambiar a Pago'; rb.title='Convertir de Bono a pago real';
-            rb.onclick=async()=>{ await quitarBono(num); closeD(); await loadData(true); };
+            rb.onclick=async()=>{ 
+              rb.disabled=true; rb.textContent='⏳';
+              const r = await quitarBono(num);
+              if(r) { 
+                DATA[num].paymethod='DEF'; 
+                closeD(); 
+                renderCurrent(); 
+                updateStats();
+              }
+              rb.disabled=false;
+            };
             ac.appendChild(rb);
           }
         }
@@ -2506,14 +2527,14 @@ async function togglePaid(num){
 }
 async function marcarBono(num){
   const r = await updateTicket(num, { paymethod:'BONO', paid:true });
-  if(r && r.ok) toast('Número #'+num+' marcado como Bono','ok');
-  else toast('Error al actualizar','err');
+  if(r && r.ok){ toast('Número #'+num+' marcado como Bono 🎁','ok'); return true; }
+  else { toast('Error al actualizar','err'); return false; }
 }
 
 async function quitarBono(num){
   const r = await updateTicket(num, { paymethod:'DEF' });
-  if(r && r.ok) toast('Número #'+num+' cambiado a pago real','ok');
-  else toast('Error al actualizar','err');
+  if(r && r.ok){ toast('Número #'+num+' cambiado a pago real 💵','ok'); return true; }
+  else { toast('Error al actualizar','err'); return false; }
 }
 
 
