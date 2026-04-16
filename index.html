@@ -2423,9 +2423,10 @@ async function saveEdit(){
   const phone    = document.getElementById('ep').value.trim();
   const seller   = document.getElementById('es').value.trim();
   const v        = document.getElementById('epd').value;
-  const paid     = v==='1';
-  const paymentClaim = v==='claim';
   const paymethod = document.getElementById('epaymethod')?.value || '';
+  // Si es BONO, siempre se marca como pagado
+  const paid     = paymethod === 'BONO' ? true : v==='1';
+  const paymentClaim = paymethod === 'BONO' ? false : v==='claim';
   if(!name||!phone||!seller){showMsg('emsg','err','Todos los campos requeridos');return;}
   const r = await updateTicket(editNum, {name, phone, seller, paid, paymentClaim, paymethod});
   if(r.ok){
@@ -2467,6 +2468,16 @@ function setPayMethod(val, prefix){
   });
   const hidden = document.getElementById(`${prefix}paymethod`);
   if(hidden) hidden.value = val === 'none' ? '' : val;
+  // Si se selecciona BONO en el formulario de edición, auto-marcar como pagado
+  if(val === 'BONO' && prefix === 'e'){
+    const epd = document.getElementById('epd');
+    if(epd) epd.value = '1';
+  }
+  // Si se selecciona BONO en registro admin, auto-marcar como pagado
+  if(val === 'BONO' && (prefix === 'f' || prefix === 'r')){
+    const fpd = document.getElementById(prefix+'pd') || document.getElementById('fpaid');
+    if(fpd) fpd.value = '1';
+  }
 }
 function resetPayMethod(prefix){
   setPayMethod('none', prefix);
