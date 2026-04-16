@@ -988,7 +988,7 @@ tr:hover td{background:var(--surface2)}
             <button type="button" class="pay-method-btn" id="fpm-none"  onclick="setPayMethod('none','f')" >— Sin especificar</button>
             <button type="button" class="pay-method-btn" id="fpm-DEF"  onclick="setPayMethod('DEF','f')" >💵 DEF</button>
             <button type="button" class="pay-method-btn" id="fpm-EB" onclick="setPayMethod('EB','f')">🏦 EB</button>
-            <button type="button" class="pay-method-btn" id="fpm-BONO" onclick="setPayMethod('BONO','f')">🎁 Bono</button>
+            <button type="button" class="pay-method-btn" id="fpm-BONO" onclick="setPayMethod('BONO','f')" style="display:none">🎁 Bono</button>
           </div>
           <input type="hidden" id="fpaymethod" value="">
         </div>
@@ -1130,7 +1130,7 @@ tr:hover td{background:var(--surface2)}
         <button type="button" class="pay-method-btn" id="epm-none"     onclick="setPayMethod('none','e')"    >— Sin especificar</button>
         <button type="button" class="pay-method-btn" id="epm-DEF"     onclick="setPayMethod('DEF','e')"    >💵 DEF</button>
         <button type="button" class="pay-method-btn" id="epm-EB" onclick="setPayMethod('EB','e')">🏦 EB</button>
-            <button type="button" class="pay-method-btn" id="epm-BONO" onclick="setPayMethod('BONO','e')">🎁 Bono</button>
+            <button type="button" class="pay-method-btn" id="epm-BONO" onclick="setPayMethod('BONO','e')" style="display:none">🎁 Bono</button>
       </div>
       <input type="hidden" id="epaymethod" value="">
     </div>
@@ -1188,7 +1188,7 @@ tr:hover td{background:var(--surface2)}
         <button type="button" class="pay-method-btn" id="rpm-none"     onclick="setPayMethod('none','r')"    >— Sin especificar</button>
         <button type="button" class="pay-method-btn" id="rpm-DEF"     onclick="setPayMethod('DEF','r')"    >💵 DEF</button>
         <button type="button" class="pay-method-btn" id="rpm-EB" onclick="setPayMethod('EB','r')">🏦 EB</button>
-            <button type="button" class="pay-method-btn" id="rpm-BONO" onclick="setPayMethod('BONO','r')">🎁 Bono</button>
+            
       </div>
       <input type="hidden" id="rpaymethod" value="">
     </div>
@@ -1559,6 +1559,11 @@ function launchApp(){
     // ── ADMIN UI ─────────────────────────────────────
     document.getElementById('app').style.display='block';
     document.getElementById('seller-app').style.display='none';
+    // Mostrar botón Bono solo para admin
+    ['fpm-BONO','epm-BONO'].forEach(id=>{
+      const btn = document.getElementById(id);
+      if(btn) btn.style.display='';
+    });
     document.getElementById('hname').textContent = session.name;
     const b=document.getElementById('hbadge');
     b.textContent='Admin'; b.className='badge b-admin';
