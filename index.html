@@ -2428,9 +2428,7 @@ async function saveEdit(){
   const paid     = paymethod === 'BONO' ? true : v==='1';
   const paymentClaim = paymethod === 'BONO' ? false : v==='claim';
   if(!name||!phone||!seller){showMsg('emsg','err','Todos los campos requeridos');return;}
-  console.log('saveEdit:', {editNum, name, paid, paymentClaim, paymethod});
   const r = await updateTicket(editNum, {name, phone, seller, paid, paymentClaim, paymethod});
-  console.log('updateTicket result:', r);
   if(r.ok){
     // Actualizar DATA localmente para respuesta inmediata
     DATA[editNum] = {
@@ -2470,7 +2468,6 @@ function setPayMethod(val, prefix){
   });
   const hidden = document.getElementById(`${prefix}paymethod`);
   if(hidden) hidden.value = val === 'none' ? '' : val;
-  console.log('setPayMethod:', prefix, val, 'hidden value:', hidden?.value);
   // Si se selecciona BONO en el formulario de edición, auto-marcar como pagado
   if(val === 'BONO' && prefix === 'e'){
     const epd = document.getElementById('epd');
