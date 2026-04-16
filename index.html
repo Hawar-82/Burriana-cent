@@ -2427,7 +2427,21 @@ async function saveEdit(){
   const paymethod = document.getElementById('epaymethod')?.value || '';
   if(!name||!phone||!seller){showMsg('emsg','err','Todos los campos requeridos');return;}
   const r = await updateTicket(editNum, {name, phone, seller, paid, paymentClaim, paymethod});
-  if(r.ok){logChange('edit',editNum,{name,seller});toast(`#${editNum} actualizado`,'ok');closeE();await loadData(true);}
+  if(r.ok){
+    // Actualizar DATA localmente para respuesta inmediata
+    DATA[editNum] = {
+      ...DATA[editNum],
+      name, phone, seller, paid, paymentClaim,
+      paymethod: paymethod || DATA[editNum].paymethod || ''
+    };
+    logChange('edit',editNum,{name,seller});
+    toast('#'+editNum+' actualizado','ok');
+    closeE();
+    renderCurrent();
+    updateStats();
+    // Sync en background
+    loadData(true);
+  }
   else showMsg('emsg','err','Error al guardar');
 }
 
