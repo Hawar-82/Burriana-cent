@@ -1386,6 +1386,14 @@ async function loadDataFromDB() {
 }
 
 async function saveTicket(num, entry) {
+  // Update DATA locally immediately to prevent visual disappearance during sync
+  DATA[num] = {
+    name: entry.name, phone: entry.phone||'', seller: entry.seller||'',
+    paid: entry.paid||false, paymentClaim: entry.paymentClaim||false,
+    abonos: entry.abonos||0, abonosPending: entry.abonosPending||0,
+    paymethod: entry.paymethod||'', date: entry.date||new Date().toLocaleString('es'),
+    createdAt: DATA[num]?.createdAt || new Date().toISOString()
+  };
   const existing = await sbGet('ventas', `numero=eq.${num}`);
   const row = {
     numero: num, buyer: entry.name, phone: entry.phone||'',
@@ -1603,10 +1611,17 @@ function logout(){
 }
 
 // ── LOAD DATA ─────────────────────────────────────────────
+let _loadDataInProgress = false;
 async function loadData(silent=false){
+  if(_loadDataInProgress) return; // Prevent race condition
+  _loadDataInProgress = true;
   if(!silent) setDot('loading');
   try {
-    DATA = await loadDataFromDB();
+    const newData = await loadDataFromDB();
+    // Only update if we got valid data
+    if(newData && typeof newData === 'object') {
+      DATA = newData;
+    }
     setDot('on');
     if(session) renderCurrent();
     updateStats();
@@ -1614,6 +1629,8 @@ async function loadData(silent=false){
   } catch(e){
     setDot('off');
     if(!silent) toast('Sin conexión','err');
+  } finally {
+    _loadDataInProgress = false;
   }
 }
 
@@ -1980,7 +1997,7 @@ function updateStats(){
 // ── GRID ───────────────────────────────────────────────────
 function gridItems(){
   const q=(document.getElementById('gs')||{value:''}).value.trim();
-  let nums=Array.from({length:10000},(_,i)=>pad(i));
+  let nums=Array.from({length:9999},(_,i)=>pad(i+1));
   if(gFilter==='sold')    nums=nums.filter(n=>DATA[n]);
   if(gFilter==='free')    nums=nums.filter(n=>!DATA[n]);
   if(gFilter==='paid')    nums=nums.filter(n=>DATA[n]&&DATA[n].paid);
@@ -2598,8 +2615,11 @@ async function executeDel(){
   const r = await deleteTicket(num);
   if(r.ok){
     logChange('delete', num, DATA[num]);
-    toast(`#${num} eliminado`,'err');
-    await loadData(true);
+    delete DATA[num]; // Update locally immediately
+    toast('#'+num+' eliminado','err');
+    renderCurrent();
+    updateStats();
+    loadData(true); // Sync in background
   } else toast('Error al eliminar','err');
 }
 
@@ -3216,7 +3236,7 @@ function exportMisPDF(){
 function exportLibresPDF(){
   const ocupados = new Set(Object.keys(DATA));
   const libres = [];
-  for(let i=1;i<=10000;i++){
+  for(let i=1;i<=9999;i++){
     const n=String(i).padStart(4,'0');
     if(!ocupados.has(n)) libres.push(n);
   }
@@ -3438,7 +3458,7 @@ function openNumDisponibles(){
   // Calcular disponibles: todos los números del 0001 al 10000 que no estén en DATA
   const ocupados = new Set(Object.keys(DATA));
   _allDisponibles = [];
-  for(let i = 1; i <= 10000; i++){
+  for(let i = 1; i <= 9999; i++){
     const n = String(i).padStart(4,'0');
     if(!ocupados.has(n)) _allDisponibles.push(n);
   }
