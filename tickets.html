@@ -230,21 +230,45 @@ input:focus { border-color:var(--cyan); background:rgba(0,212,255,0.08) }
   .controls, .btn-download, .no-print { display:none!important }
   * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important }
 }
+@page {
+  margin: 10mm;
+  size: A4;
+  /* Remove browser header/footer including URL */
+  margin-top: 10mm;
+  margin-bottom: 10mm;
+}
 </style>
 </head>
 <body>
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen" style="position:fixed;inset:0;background:#02040c;z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem">
-  <div style="width:100%;max-width:360px;background:rgba(4,10,24,0.95);border:1px solid rgba(0,212,255,0.2);border-radius:16px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,0.7)">
+  <div style="width:100%;max-width:380px;background:rgba(4,10,24,0.95);border:1px solid rgba(0,212,255,0.2);border-radius:16px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,0.7)">
     <div style="text-align:center;margin-bottom:1.5rem">
       <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#b44fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent">El Milagro</div>
-      <div style="color:#3a6080;font-size:.85rem;margin-top:.25rem">Generador de Boletos — Acceso restringido</div>
+      <div style="color:#3a6080;font-size:.85rem;margin-top:.25rem">Generador de Boletos</div>
     </div>
-    <div style="margin-bottom:1rem">
-      <label style="display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#3a6080;margin-bottom:.35rem">Contraseña</label>
+    <!-- Tabs -->
+    <div style="display:flex;gap:.5rem;margin-bottom:1.25rem">
+      <button id="tab-admin" onclick="setLoginTab('admin')" style="flex:1;padding:.5rem;border-radius:8px;border:1.5px solid rgba(0,212,255,0.4);background:rgba(0,212,255,0.1);color:#00d4ff;font-family:'Outfit',sans-serif;font-weight:600;cursor:pointer">🔑 Admin</button>
+      <button id="tab-seller" onclick="setLoginTab('seller')" style="flex:1;padding:.5rem;border-radius:8px;border:1.5px solid rgba(255,255,255,0.1);background:transparent;color:#3a6080;font-family:'Outfit',sans-serif;font-weight:600;cursor:pointer">👤 Colaborador</button>
+    </div>
+    <!-- Admin login -->
+    <div id="form-admin">
+      <label style="display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#3a6080;margin-bottom:.35rem">Contraseña Admin</label>
       <input type="password" id="login-pass" placeholder="••••••••"
-        style="width:100%;background:rgba(0,212,255,0.04);border:1.5px solid rgba(0,212,255,0.2);color:#f0f8ff;padding:.75rem 1rem;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;outline:none"
+        style="width:100%;background:rgba(0,212,255,0.04);border:1.5px solid rgba(0,212,255,0.2);color:#f0f8ff;padding:.75rem 1rem;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;outline:none;margin-bottom:.75rem"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <!-- Seller login -->
+    <div id="form-seller" style="display:none">
+      <label style="display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#3a6080;margin-bottom:.35rem">Usuario</label>
+      <input type="text" id="login-user" placeholder="tu.usuario"
+        style="width:100%;background:rgba(0,212,255,0.04);border:1.5px solid rgba(0,212,255,0.2);color:#f0f8ff;padding:.75rem 1rem;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;outline:none;margin-bottom:.75rem"
+        onkeydown="if(event.key==='Enter')document.getElementById('login-pass-s').focus()">
+      <label style="display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#3a6080;margin-bottom:.35rem">Contraseña</label>
+      <input type="password" id="login-pass-s" placeholder="••••••••"
+        style="width:100%;background:rgba(0,212,255,0.04);border:1.5px solid rgba(0,212,255,0.2);color:#f0f8ff;padding:.75rem 1rem;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;outline:none;margin-bottom:.75rem"
         onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div id="login-err" style="color:#ff4466;font-size:.8rem;margin-bottom:.75rem;min-height:1rem;text-align:center"></div>
@@ -282,28 +306,83 @@ input:focus { border-color:var(--cyan); background:rgba(0,212,255,0.08) }
 
 <script>
 const ADMIN_PASS = 'sandwil@admin1@';
+const SUPABASE_URL_AUTH = 'https://ksnpmrqdpqjdnqhcfjvl.supabase.co';
+const SUPABASE_KEY_AUTH = 'sb_publishable_CkDbDY89w_YKk8Q7NUC26g_oh-2Sflx';
 
-function doLogin() {
-  const pass = document.getElementById('login-pass').value;
-  if(pass === ADMIN_PASS) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app-content').style.display = 'block';
-    sessionStorage.setItem('tickets_auth', '1');
+let currentSession = null; // {role, name, seller}
+let loginTab = 'admin';
+
+function setLoginTab(tab) {
+  loginTab = tab;
+  document.getElementById('form-admin').style.display  = tab==='admin'  ? '' : 'none';
+  document.getElementById('form-seller').style.display = tab==='seller' ? '' : 'none';
+  document.getElementById('tab-admin').style.cssText   = tab==='admin'
+    ? 'flex:1;padding:.5rem;border-radius:8px;border:1.5px solid rgba(0,212,255,0.4);background:rgba(0,212,255,0.1);color:#00d4ff;font-family:Outfit,sans-serif;font-weight:600;cursor:pointer'
+    : 'flex:1;padding:.5rem;border-radius:8px;border:1.5px solid rgba(255,255,255,0.1);background:transparent;color:#3a6080;font-family:Outfit,sans-serif;font-weight:600;cursor:pointer';
+  document.getElementById('tab-seller').style.cssText  = tab==='seller'
+    ? 'flex:1;padding:.5rem;border-radius:8px;border:1.5px solid rgba(180,79,255,0.4);background:rgba(180,79,255,0.1);color:#b44fff;font-family:Outfit,sans-serif;font-weight:600;cursor:pointer'
+    : 'flex:1;padding:.5rem;border-radius:8px;border:1.5px solid rgba(255,255,255,0.1);background:transparent;color:#3a6080;font-family:Outfit,sans-serif;font-weight:600;cursor:pointer';
+  document.getElementById('login-err').textContent = '';
+}
+
+async function doLogin() {
+  const err = document.getElementById('login-err');
+  err.textContent = '';
+
+  if(loginTab === 'admin') {
+    const pass = document.getElementById('login-pass').value;
+    if(pass === ADMIN_PASS) {
+      currentSession = {role:'admin', name:'Administrador', seller:null};
+      sessionStorage.setItem('tickets_session', JSON.stringify(currentSession));
+      launchApp();
+    } else {
+      err.textContent = '❌ Contraseña incorrecta';
+      document.getElementById('login-pass').value = '';
+    }
   } else {
-    document.getElementById('login-err').textContent = '❌ Contraseña incorrecta';
-    document.getElementById('login-pass').value = '';
-    document.getElementById('login-pass').focus();
+    const user = document.getElementById('login-user').value.trim();
+    const pass = document.getElementById('login-pass-s').value;
+    if(!user || !pass) { err.textContent = '❌ Ingresa usuario y contraseña'; return; }
+    err.textContent = '⏳ Verificando...';
+    try {
+      const r = await fetch(`${SUPABASE_URL_AUTH}/rest/v1/colaboradores?usuario=eq.${encodeURIComponent(user)}&contrasena=eq.${encodeURIComponent(pass)}&select=nombre,usuario`, {
+        headers: { 'apikey': SUPABASE_KEY_AUTH, 'Authorization': 'Bearer ' + SUPABASE_KEY_AUTH }
+      });
+      const data = await r.json();
+      if(data && data.length > 0) {
+        currentSession = {role:'seller', name:data[0].nombre, seller:data[0].nombre};
+        sessionStorage.setItem('tickets_session', JSON.stringify(currentSession));
+        launchApp();
+      } else {
+        err.textContent = '❌ Usuario o contraseña incorrectos';
+      }
+    } catch(e) {
+      err.textContent = '❌ Error de conexión';
+    }
   }
 }
 
-// Auto-login if already authenticated in this session
-window.addEventListener('load', () => {
-  if(sessionStorage.getItem('tickets_auth') === '1') {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app-content').style.display = 'block';
-  } else {
-    setTimeout(() => document.getElementById('login-pass')?.focus(), 100);
+function launchApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-content').style.display = 'block';
+  // Show seller name if colaborador
+  if(currentSession.role === 'seller') {
+    const header = document.querySelector('.header .subtitle');
+    if(header) header.textContent = '👤 ' + currentSession.name;
   }
+}
+
+// Auto-login if session exists
+window.addEventListener('load', () => {
+  const saved = sessionStorage.getItem('tickets_session');
+  if(saved) {
+    try {
+      currentSession = JSON.parse(saved);
+      launchApp();
+      return;
+    } catch(e) {}
+  }
+  setTimeout(() => document.getElementById('login-pass')?.focus(), 100);
 });
 
 const SUPABASE_URL = 'https://ksnpmrqdpqjdnqhcfjvl.supabase.co';
@@ -378,6 +457,11 @@ async function generarBoleto() {
       abonos: data[0].abonos || 0,
       date:   data[0].fecha  || new Date().toLocaleDateString('es')
     };
+    // Colaborador solo puede ver sus propios números
+    if(currentSession && currentSession.role === 'seller' && entry.seller !== currentSession.seller) {
+      document.getElementById('msg').textContent = '❌ Este número no pertenece a tu cartera';
+      return;
+    }
     // Show ticket info
     document.getElementById('ticket-data').innerHTML =
       '<b>' + entry.name + '</b><br>' +
@@ -461,45 +545,43 @@ async function descargarPDF() {
   if(btn) { btn.textContent = '⏳ Generando PDF...'; btn.disabled = true; }
 
   try {
-    // Capture boleto as image
-    const canvas = await html2canvas(area.firstElementChild, {
+    const boleto = area.firstElementChild;
+
+    // Temporarily set white background for clean capture
+    const origBg = boleto.style.background;
+    boleto.style.background = 'transparent';
+
+    const canvas = await html2canvas(boleto, {
       scale: 3,
       useCORS: true,
-      backgroundColor: null,
-      logging: false
+      allowTaint: true,
+      backgroundColor: '#02040c',
+      logging: false,
+      removeContainer: true,
+      ignoreElements: (el) => el.classList && el.classList.contains('no-print')
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    boleto.style.background = origBg;
+
+    const imgData = canvas.toDataURL('image/png');
     const { jsPDF } = window.jspdf;
 
-    // A4 portrait
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = 210;
-    const pageH = 297;
+    // Use ticket dimensions - not A4 to avoid margins
+    const mmW = 100; // ticket width in mm
+    const mmH = (canvas.height / canvas.width) * mmW;
 
-    // Calculate ticket dimensions to fit centered on A4
-    const imgW = canvas.width;
-    const imgH = canvas.height;
-    const ratio = imgW / imgH;
+    const pdf = new jsPDF({
+      orientation: mmH > mmW ? 'portrait' : 'landscape',
+      unit: 'mm',
+      format: [mmW, mmH] // custom size = exact ticket size, no margins
+    });
 
-    const maxW = 160; // max width in mm
-    const maxH = 240; // max height in mm
-
-    let ticketW = maxW;
-    let ticketH = ticketW / ratio;
-    if(ticketH > maxH) {
-      ticketH = maxH;
-      ticketW = ticketH * ratio;
-    }
-
-    const x = (pageW - ticketW) / 2;
-    const y = (pageH - ticketH) / 2;
-
-    pdf.addImage(imgData, 'JPEG', x, y, ticketW, ticketH);
+    pdf.addImage(imgData, 'PNG', 0, 0, mmW, mmH);
     pdf.save('boleto-' + numPad + '.pdf');
 
   } catch(e) {
     alert('Error generando PDF: ' + e.message);
+    console.error(e);
   } finally {
     if(btn) { btn.textContent = '📄 Descargar PDF'; btn.disabled = false; }
   }
