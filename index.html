@@ -2012,7 +2012,7 @@ function updateStats(){
 // ── GRID ───────────────────────────────────────────────────
 function gridItems(){
   const q=(document.getElementById('gs')||{value:''}).value.trim();
-  let nums=Array.from({length:9999},(_,i)=>pad(i+1));
+  let nums=Array.from({length:10000},(_,i)=>pad(i));
   if(gFilter==='sold')    nums=nums.filter(n=>DATA[n]);
   if(gFilter==='free')    nums=nums.filter(n=>!DATA[n]);
   if(gFilter==='paid')    nums=nums.filter(n=>DATA[n]&&DATA[n].paid);
@@ -3271,7 +3271,7 @@ function exportMisPDF(){
 function exportLibresPDF(){
   const ocupados = new Set(Object.keys(DATA));
   const libres = [];
-  for(let i=1;i<=9999;i++){
+  for(let i=0;i<=9999;i++){
     const n=String(i).padStart(4,'0');
     if(!ocupados.has(n)) libres.push(n);
   }
@@ -3493,7 +3493,7 @@ function openNumDisponibles(){
   // Calcular disponibles: todos los números del 0001 al 10000 que no estén en DATA
   const ocupados = new Set(Object.keys(DATA));
   _allDisponibles = [];
-  for(let i = 1; i <= 9999; i++){
+  for(let i = 0; i <= 9999; i++){
     const n = String(i).padStart(4,'0');
     if(!ocupados.has(n)) _allDisponibles.push(n);
   }
