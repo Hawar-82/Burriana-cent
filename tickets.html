@@ -234,6 +234,28 @@ input:focus { border-color:var(--cyan); background:rgba(0,212,255,0.08) }
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="login-screen" style="position:fixed;inset:0;background:#02040c;z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem">
+  <div style="width:100%;max-width:360px;background:rgba(4,10,24,0.95);border:1px solid rgba(0,212,255,0.2);border-radius:16px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,0.7)">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#b44fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent">El Milagro</div>
+      <div style="color:#3a6080;font-size:.85rem;margin-top:.25rem">Generador de Boletos — Acceso restringido</div>
+    </div>
+    <div style="margin-bottom:1rem">
+      <label style="display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#3a6080;margin-bottom:.35rem">Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••"
+        style="width:100%;background:rgba(0,212,255,0.04);border:1.5px solid rgba(0,212,255,0.2);color:#f0f8ff;padding:.75rem 1rem;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;outline:none"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div id="login-err" style="color:#ff4466;font-size:.8rem;margin-bottom:.75rem;min-height:1rem;text-align:center"></div>
+    <button onclick="doLogin()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#0060cc,#00d4ff 50%,#7b00ff);color:#fff;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700;cursor:pointer">
+      Entrar
+    </button>
+  </div>
+</div>
+
+<div id="app-content" style="display:none">
+
 <div class="header no-print">
   <div class="brand">El Milagro</div>
   <div class="subtitle">Generador de Boletos</div>
@@ -259,6 +281,31 @@ input:focus { border-color:var(--cyan); background:rgba(0,212,255,0.08) }
 <div id="boleto-area"></div>
 
 <script>
+const ADMIN_PASS = 'sandwil@admin1@';
+
+function doLogin() {
+  const pass = document.getElementById('login-pass').value;
+  if(pass === ADMIN_PASS) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+    sessionStorage.setItem('tickets_auth', '1');
+  } else {
+    document.getElementById('login-err').textContent = '❌ Contraseña incorrecta';
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-pass').focus();
+  }
+}
+
+// Auto-login if already authenticated in this session
+window.addEventListener('load', () => {
+  if(sessionStorage.getItem('tickets_auth') === '1') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+  } else {
+    setTimeout(() => document.getElementById('login-pass')?.focus(), 100);
+  }
+});
+
 const SUPABASE_URL = 'https://ksnpmrqdpqjdnqhcfjvl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_CkDbDY89w_YKk8Q7NUC26g_oh-2Sflx';
 const SECRET = 'BurrianaMilagro2026#';
@@ -458,5 +505,6 @@ async function descargarPDF() {
   }
 }
 </script>
+</div><!-- /app-content -->
 </body>
 </html>
