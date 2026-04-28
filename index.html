@@ -2683,16 +2683,24 @@ document.addEventListener('click', e=>{
 function exportPDF(){
   const entries = Object.entries(DATA).sort(([a],[b])=>a.localeCompare(b));
   const sold    = entries.length;
-  const paid    = entries.filter(([,e])=>e.paid).length;
+  const bonos   = entries.filter(([,e])=>e.paymethod==='BONO').length;
+  const paid    = entries.filter(([,e])=>e.paid && e.paymethod!=='BONO').length;
   const claimed = entries.filter(([,e])=>e.paymentClaim&&!e.paid).length;
-  const unpaid  = sold - paid - claimed;
+  const unpaid  = sold - paid - bonos - claimed;
+  const totalRecaudado = entries.reduce((s,[,e])=>{
+    if(e.paymethod==='BONO') return s;
+    if(e.paid) return s + TICKET;
+    return s + (e.abonos||0);
+  }, 0);
   const now     = new Date().toLocaleString('es');
 
-  const payBadge = e => e.paid
-    ? `<span class="pbadge paid">✓ Pagado</span>`
-    : e.paymentClaim
-      ? `<span class="pbadge" style="background:#fff8d0;color:#a07000;border:1px solid #e0c040">🕐 Reportado</span>`
-      : `<span class="pbadge unpaid">⏳ Pendiente</span>`;
+  const payBadge = e => e.paymethod==='BONO'
+    ? `<span class="pbadge" style="background:#f0e8ff;color:#7a3ab4;border:1px solid #c9a0f0">🎁 Bono</span>`
+    : e.paid
+      ? `<span class="pbadge paid">✓ Pagado</span>`
+      : e.paymentClaim
+        ? `<span class="pbadge" style="background:#fff8d0;color:#a07000;border:1px solid #e0c040">🕐 Reportado</span>`
+        : `<span class="pbadge unpaid">⏳ Pendiente</span>`;
 
   // ── Agrupar por colaborador
   const bySeller = {};
@@ -2703,15 +2711,20 @@ function exportPDF(){
   });
 
   // ── Tabla completa
-  const allRows = entries.map(([num,e])=>`
-    <tr>
+  const allRows = entries.map(([num,e])=>{
+    const esBono = e.paymethod==='BONO';
+    const abonado = esBono ? '🎁' : e.paid ? fmt(TICKET) : fmt(e.abonos||0);
+    const saldo = esBono ? '🎁' : e.paid ? '✓' : fmt(Math.max(0,TICKET-(e.abonos||0)));
+    return `<tr>
       <td><span class="print-num">${num}</span></td>
       <td>${e.name}</td>
       <td>${e.phone}</td>
       <td>${e.seller||''}</td>
       <td>${payBadge(e)}</td>
+      <td style="text-align:right">${abonado}</td>
+      <td style="text-align:right;color:${e.paid||esBono?'#1a7a3a':'#c03020'}">${saldo}</td>
       <td style="font-size:.72rem;color:#888">${e.date||''}</td>
-    </tr>`).join('');
+    </tr>`;}).join('');
 
   // ── Lista pendiente (incluye reportados)
   const pendingRows = entries.filter(([,e])=>!e.paid).map(([num,e])=>`
@@ -2764,10 +2777,12 @@ function exportPDF(){
       </div>
       <div class="print-stats">
         <div class="pstat gold"><div class="pv">${sold.toLocaleString()}</div><div class="pl">Reservados</div></div>
-        <div class="pstat"><div class="pv">${(10000-sold).toLocaleString()}</div><div class="pl">Disponibles</div></div>
+        <div class="pstat"><div class="pv">${(9999-sold).toLocaleString()}</div><div class="pl">Disponibles</div></div>
         <div class="pstat green"><div class="pv">${paid.toLocaleString()}</div><div class="pl">Pagados</div></div>
+        ${bonos>0?`<div class="pstat" style="border-color:#c9a0f0"><div class="pv" style="color:#7a3ab4">${bonos}</div><div class="pl">Bonos</div></div>`:''}
         <div class="pstat" style="border-color:#e0c040"><div class="pv" style="color:#a07000">${claimed.toLocaleString()}</div><div class="pl">Reportados</div></div>
         <div class="pstat red"><div class="pv">${unpaid.toLocaleString()}</div><div class="pl">Pendiente</div></div>
+        <div class="pstat" style="border-color:#00d4ff"><div class="pv" style="color:#00d4ff;font-size:1rem">${fmt(totalRecaudado)}</div><div class="pl">Recaudado</div></div>
       </div>
       <div class="print-section-title">📊 Resumen por Colaborador</div>
       ${sellerRows || '<p style="color:#888;font-size:.85rem">Sin registros aún</p>'}
@@ -2783,7 +2798,7 @@ function exportPDF(){
       <div class="print-section-title">🎟 Todos los Números Reservados (${sold})</div>
       ${sold > 0 ? `
       <table class="print-table">
-        <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Colaborador</th><th>Pago</th><th>Fecha</th></tr></thead>
+        <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Colaborador</th><th>Pago</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo</th><th>Fecha</th></tr></thead>
         <tbody>${allRows}</tbody>
       </table>` : '<p style="color:#888;font-size:.85rem">Sin registros aún</p>'}
     </div>
@@ -3187,19 +3202,33 @@ function exportMisPDF(){
   if(!misNumeros.length){ toast('No tienes números registrados','err'); return; }
 
   const totalReservados = misNumeros.length;
-  const totalPagados    = misNumeros.filter(([,e]) => e.paid).length;
-  const totalAbonado    = misNumeros.reduce((s,[,e]) => s+(e.abonos||0), 0);
-  const totalPendiente  = misNumeros.reduce((s,[,e]) => s+Math.max(0,TICKET-(e.abonos||0)-(e.abonosPending||0)), 0);
+  const totalPagados    = misNumeros.filter(([,e]) => e.paid && e.paymethod!=='BONO').length;
+  const totalBonos      = misNumeros.filter(([,e]) => e.paymethod==='BONO').length;
+  // Abonado: pagados cuentan TICKET completo, abonados parciales suman su abono
+  const totalAbonado    = misNumeros.reduce((s,[,e]) => {
+    if(e.paymethod==='BONO') return s;
+    if(e.paid) return s + TICKET;
+    return s + (e.abonos||0);
+  }, 0);
+  const totalPendiente  = misNumeros.reduce((s,[,e]) => {
+    if(e.paid || e.paymethod==='BONO') return s;
+    return s + Math.max(0, TICKET-(e.abonos||0)-(e.abonosPending||0));
+  }, 0);
 
   const rows = misNumeros.map(([num,e]) => {
-    const abonado = e.abonos||0;
-    const saldo   = Math.max(0, TICKET - abonado - (e.abonosPending||0));
-    const estado  = e.paid ? '<span style="color:#1a7a3a">Pagado</span>' :
-                    e.paymentClaim ? '<span style="color:#c09020">Reportado</span>' :
-                    abonado > 0 ? '<span style="color:#1a5a8a">Abonado</span>' :
-                    '<span style="color:#c04040">Pendiente</span>';
+    const esBono  = e.paymethod === 'BONO';
+    // Si está pagado, mostrar TICKET como abonado (pago completo), excepto bonos
+    const abonado = e.paid && !esBono ? TICKET : (e.abonos||0);
+    const saldo   = e.paid ? 0 : Math.max(0, TICKET - (e.abonos||0) - (e.abonosPending||0));
+    const estado  = esBono ? '<span style="color:#7a3ab4">🎁 Bono</span>' :
+                    e.paid ? '<span style="color:#1a7a3a">✅ Pagado</span>' :
+                    e.paymentClaim ? '<span style="color:#c09020">⏳ Reportado</span>' :
+                    (e.abonos||0) > 0 ? '<span style="color:#1a5a8a">💰 Abonado</span>' :
+                    '<span style="color:#c04040">❌ Pendiente</span>';
     const name = e.name.length > 30 ? e.name.substring(0,28)+'…' : e.name;
-    return '<tr><td>#'+num+'</td><td>'+name+'</td><td>'+fmt(abonado)+'</td><td>'+estado+'</td><td>'+(saldo>0?fmt(saldo):'✓')+'</td></tr>';
+    const abonadoDisplay = esBono ? '🎁' : fmt(abonado);
+    const saldoDisplay   = esBono ? '🎁' : (saldo > 0 ? fmt(saldo) : '✓');
+    return '<tr><td>#'+num+'</td><td>'+name+'</td><td>'+abonadoDisplay+'</td><td>'+estado+'</td><td>'+saldoDisplay+'</td></tr>';
   }).join('');
 
   const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Informe '+sellerName+'</title>' +
@@ -3218,7 +3247,8 @@ function exportMisPDF(){
     '<div class="stats">' +
     '<div class="stat"><b>'+totalReservados+'</b>Reservados</div>' +
     '<div class="stat"><b>'+totalPagados+'</b>Pagados</div>' +
-    '<div class="stat"><b>'+fmt(totalAbonado)+'</b>Abonado</div>' +
+    (totalBonos>0?'<div class="stat" style="background:#f0e8ff"><b style="color:#7a3ab4">'+totalBonos+'</b>Bonos</div>':'') +
+    '<div class="stat"><b>'+fmt(totalAbonado)+'</b>Recaudado</div>' +
     '<div class="stat"><b>'+fmt(totalPendiente)+'</b>Pendiente</div>' +
     '</div>' +
     '<table><tr><th>#</th><th>Comprador</th><th>Abonado</th><th>Estado</th><th>Saldo</th></tr>' +
