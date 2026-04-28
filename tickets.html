@@ -296,8 +296,11 @@ input:focus { border-color:var(--cyan); background:rgba(0,212,255,0.08) }
   </div>
   <button class="btn btn-primary" onclick="generarBoleto()">🎟 Generar Boleto</button>
   <div style="display:flex;gap:.75rem;margin-top:.75rem">
-    <button class="btn btn-secondary" style="flex:1" onclick="window.print()">🖨 Imprimir / PDF</button>
-    <button class="btn btn-secondary" style="flex:1" onclick="descargarPDF()" class="btn-download">📄 Descargar PDF</button>
+    <button class="btn btn-secondary" style="flex:1" onclick="imprimirBoleto()">🖨 Imprimir</button>
+    <button class="btn btn-secondary" style="flex:1" onclick="descargarPDF()">📄 Descargar PDF</button>
+  </div>
+  <div style="margin-top:.5rem;padding:.5rem .75rem;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.1);border-radius:8px;font-size:.72rem;color:#3a6080;line-height:1.7">
+    💡 PDF sin URL: usa <b style="color:#90b8d8">📄 Descargar PDF</b> · Al imprimir desactiva <b style="color:#90b8d8">"Encabezados y pies"</b>
   </div>
   <div id="msg" style="margin-top:.75rem;font-size:.82rem;color:var(--text3);text-align:center"></div>
 </div>
@@ -535,57 +538,71 @@ async function generarBoleto() {
   document.getElementById('msg').textContent = '✅ Boleto generado — usa Imprimir o Descargar';
 }
 
+function imprimirBoleto() {
+  const area = document.getElementById('boleto-area');
+  if(!area || !area.innerHTML.trim()) { alert('Genera un boleto primero'); return; }
+
+  // Get all styles from the page
+  const styles = Array.from(document.styleSheets).map(ss => {
+    try { return Array.from(ss.cssRules).map(r => r.cssText).join('\n'); }
+    catch(e) { return ''; }
+  }).join('\n');
+
+  const win = window.open('', '_blank', 'width=500,height=800');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <style>
+      @page { margin: 0; size: auto; }
+      * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important }
+      body { background:white; display:flex; justify-content:center; padding:8mm; }
+      ${styles}
+    </style>
+  </head><body>
+    ${area.innerHTML}
+    <script>
+      window.onload = function() {
+        setTimeout(function() { window.print(); }, 600);
+      };
+    <\/script>
+  </body></html>`);
+  win.document.close();
+}
+
 async function descargarPDF() {
   const area = document.getElementById('boleto-area');
-  if(!area.innerHTML.trim()) { alert('Genera un boleto primero'); return; }
+  if(!area || !area.innerHTML.trim()) { alert('Genera un boleto primero'); return; }
+
   const numVal = document.getElementById('inp-num').value || '0000';
   const numPad = String(numVal).padStart(4,'0');
-
-  const btn = document.querySelector('.btn-download');
-  if(btn) { btn.textContent = '⏳ Generando PDF...'; btn.disabled = true; }
+  const btn = document.querySelector('[onclick="descargarPDF()"]');
+  if(btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
 
   try {
     const boleto = area.firstElementChild;
-
-    // Temporarily set white background for clean capture
-    const origBg = boleto.style.background;
-    boleto.style.background = 'transparent';
-
     const canvas = await html2canvas(boleto, {
       scale: 3,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#02040c',
-      logging: false,
-      removeContainer: true,
-      ignoreElements: (el) => el.classList && el.classList.contains('no-print')
+      logging: false
     });
-
-    boleto.style.background = origBg;
 
     const imgData = canvas.toDataURL('image/png');
     const { jsPDF } = window.jspdf;
 
-    // Use ticket dimensions - not A4 to avoid margins
-    const mmW = 100; // ticket width in mm
+    const mmW = 105;
     const mmH = (canvas.height / canvas.width) * mmW;
-
-    const pdf = new jsPDF({
-      orientation: mmH > mmW ? 'portrait' : 'landscape',
-      unit: 'mm',
-      format: [mmW, mmH] // custom size = exact ticket size, no margins
-    });
-
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [mmW, mmH] });
     pdf.addImage(imgData, 'PNG', 0, 0, mmW, mmH);
     pdf.save('boleto-' + numPad + '.pdf');
 
   } catch(e) {
-    alert('Error generando PDF: ' + e.message);
-    console.error(e);
+    alert('Error: ' + e.message);
   } finally {
     if(btn) { btn.textContent = '📄 Descargar PDF'; btn.disabled = false; }
   }
 }
+
 </script>
 </div><!-- /app-content -->
 </body>
