@@ -1340,6 +1340,19 @@ async function sbPatch(table, filter, data) {
   });
   return { ok: r.ok };
 }
+
+async function sbUpsert(table, data) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...headers, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(data)
+  });
+  if(!r.ok) {
+    const err = await r.text();
+    return { ok: false, error: err };
+  }
+  return { ok: true };
+}
 async function sbDelete(table, filter) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
     method: 'DELETE', headers
@@ -1386,7 +1399,7 @@ async function loadDataFromDB() {
 }
 
 async function saveTicket(num, entry) {
-  // Update DATA locally immediately to prevent visual disappearance during sync
+  // Update DATA locally immediately
   DATA[num] = {
     name: entry.name, phone: entry.phone||'', seller: entry.seller||'',
     paid: entry.paid||false, paymentClaim: entry.paymentClaim||false,
@@ -1394,7 +1407,7 @@ async function saveTicket(num, entry) {
     paymethod: entry.paymethod||'', date: entry.date||new Date().toLocaleString('es'),
     createdAt: DATA[num]?.createdAt || new Date().toISOString()
   };
-  const existing = await sbGet('ventas', `numero=eq.${num}`);
+  // Use UPSERT - no need for extra GET request
   const row = {
     numero: num, buyer: entry.name, phone: entry.phone||'',
     seller: entry.seller||'', paid: entry.paid||false,
@@ -1402,8 +1415,7 @@ async function saveTicket(num, entry) {
     abonos: entry.abonos||0, abonos_pending: entry.abonosPending||0,
     method: entry.paymethod||'', fecha: entry.date||''
   };
-  if (existing.length) return sbPatch('ventas', `numero=eq.${num}`, row);
-  return sbPost('ventas', row);
+  return sbUpsert('ventas', row);
 }
 
 async function deleteTicket(num) {
@@ -1714,9 +1726,12 @@ async function submitSellerForm(){
   btn.disabled=false; btn.textContent='✓ Registrar';
   if(r.ok){
     logChange('register', num, {name, seller:session.name});
-    toast(`#${num} registrado ✓`,'ok');
+    toast('#'+num+' registrado ✓','ok');
     resetSellerForm(true);
-    await loadData(true);
+    renderCurrent();
+    updateStats();
+    // Sync in background with delay to avoid race condition
+    setTimeout(() => loadData(true), 2000);
   } else showMsg('sf-msg','err', r.error||'Error al guardar');
 }
 function renderMySales(){
@@ -2082,95 +2097,82 @@ function renderTable(){
     num.includes(q)||e.name.toLowerCase().includes(q)||
     e.seller.toLowerCase().includes(q)||e.phone.includes(q));
   rows.sort(([a],[b])=>a.localeCompare(b));
-  const tbody=document.getElementById('tbody'); tbody.innerHTML='';
+  const tbody=document.getElementById('tbody');
+  const isAdmin = session && session.role==='admin';
+
   if(!rows.length){
-    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text3)">Sin resultados</td></tr>`;
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text3)">Sin resultados</td></tr>';
   } else {
-    rows.forEach(([num,e])=>{
+    // Batch render with innerHTML for performance
+    tbody.innerHTML = rows.map(([num,e])=>{
       const abonado = e.abonos||0;
       const pending = e.abonosPending||0;
-      const abonoCell = e.paid
-        ? `<span style="color:var(--green);font-size:.78rem">✓ Completo</span>`
-        : abonado > 0
-          ? `<span style="color:var(--green);font-family:'Space Mono',monospace;font-size:.78rem">${fmt(abonado)}</span>
-             ${pending>0?`<br><span style="color:#c09020;font-size:.7rem">+${fmt(pending)} pend.</span>`:''}`
-          : `<span style="color:var(--text3);font-size:.78rem">—</span>`;
-      const tr=document.createElement('tr');
-      if(e.paymentClaim&&!e.paid) tr.style.background='rgba(240,184,64,0.04)';
-      else if(abonado>0&&!e.paid) tr.style.background='rgba(80,200,140,0.04)';
-      tr.innerHTML=`<td><span class="mono">#${num}</span></td>
-        <td><strong>${e.name}</strong></td>
-        <td style="color:var(--text2)">${e.phone}</td>
-        <td><span class="pill ps">${e.seller}</span></td>
-        <td>${payBadge(e)}</td>
-        <td>${abonoCell}</td>
-        <td style="color:var(--text3);font-size:.78rem">${e.date||''}</td>
-        <td class="acell" id="ac-${num}" style="display:${session&&session.role==='admin'?'flex':'none'}"></td>`;
-      tbody.appendChild(tr);
-      if(session&&session.role==='admin'){
-        const ac=tr.querySelector(`#ac-${num}`);
+      const esBono  = e.paymethod==='BONO';
+      const abonoCell = esBono
+        ? '<span style="color:#b44fff;font-size:.78rem">🎁 Bono</span>'
+        : e.paid
+          ? '<span style="color:var(--green);font-size:.78rem">✓ Completo</span>'
+          : abonado > 0
+            ? '<span style="color:var(--green);font-family:Space Mono,monospace;font-size:.78rem">'+fmt(abonado)+'</span>'+(pending>0?'<br><span style="color:#c09020;font-size:.7rem">+'+fmt(pending)+' pend.</span>':'')
+            : '<span style="color:var(--text3);font-size:.78rem">—</span>';
+      const rowBg = e.paymentClaim&&!e.paid ? 'rgba(240,184,64,0.04)' : abonado>0&&!e.paid ? 'rgba(80,200,140,0.04)' : '';
+      const adminCell = isAdmin ? '<td class="acell" data-num="'+num+'" style="display:flex"></td>' : '<td></td>';
+      return '<tr style="background:'+rowBg+'"><td><span class="mono">#'+num+'</span></td>'
+        +'<td><strong>'+e.name+'</strong></td>'
+        +'<td style="color:var(--text2)">'+e.phone+'</td>'
+        +'<td><span class="pill ps">'+e.seller+'</span></td>'
+        +'<td>'+payBadge(e)+'</td>'
+        +'<td>'+abonoCell+'</td>'
+        +'<td style="color:var(--text3);font-size:.78rem">'+(e.date||'')+'</td>'
+        + adminCell
+        +'</tr>';
+    }).join('');
+
+    // Attach admin action buttons via delegation
+    if(isAdmin){
+      tbody.querySelectorAll('.acell[data-num]').forEach(ac => {
+        const num = ac.dataset.num;
+        const e = DATA[num];
+        if(!e) return;
         const eb=document.createElement('button');
         eb.className='btn btn-ghost btn-sm'; eb.textContent='✏️'; eb.onclick=()=>openE(num);
         ac.appendChild(eb);
         if(e.paymentClaim&&!e.paid){
           const ok=document.createElement('button');
-          ok.className='btn btn-green btn-sm'; ok.textContent='✓ OK'; ok.title='Confirmar pago';
+          ok.className='btn btn-green btn-sm'; ok.textContent='✓ OK';
           ok.onclick=()=>confirmPay(num);
           const rej=document.createElement('button');
-          rej.className='btn btn-red btn-sm'; rej.textContent='✗'; rej.title='Rechazar pago';
+          rej.className='btn btn-red btn-sm'; rej.textContent='✗';
           rej.onclick=()=>rejectPay(num);
           ac.appendChild(ok); ac.appendChild(rej);
         } else {
           const pb=document.createElement('button');
           pb.className=e.paid?'btn btn-ghost btn-sm':'btn btn-green btn-sm';
-          pb.textContent=e.paid?'↩ Desmarcar':'✓ Pagado'; pb.title=e.paid?'Desmarcar pago':'Marcar pagado';
+          pb.textContent=e.paid?'↩':'✓ Pagado';
           pb.onclick=()=>togglePaid(num);
           ac.appendChild(pb);
-          // Botón convertir a Bono (solo admin, solo si está pagado)
-          if(session && session.role==='admin' && e.paid && e.paymethod!=='BONO'){
+          if(e.paid && e.paymethod!=='BONO'){
             const bb=document.createElement('button');
             bb.className='btn btn-sm'; bb.style.cssText='background:rgba(180,79,255,0.15);border:1px solid rgba(180,79,255,0.4);color:#b44fff';
-            bb.textContent='🎁 Marcar Bono'; bb.title='Convertir a pago Bono (no monetario)';
-            bb.onclick=async()=>{ 
-              bb.disabled=true; bb.textContent='⏳';
-              const r = await marcarBono(num);
-              if(r) { 
-                DATA[num].paymethod='BONO'; 
-                DATA[num].paid=true;
-                closeD(); 
-                renderCurrent(); 
-                updateStats();
-              }
-              bb.disabled=false;
-            };
+            bb.textContent='🎁'; bb.title='Marcar como Bono';
+            bb.onclick=async()=>{ bb.disabled=true; bb.textContent='⏳'; const r=await marcarBono(num); if(r){DATA[num].paymethod='BONO';renderCurrent();updateStats();} bb.disabled=false; };
             ac.appendChild(bb);
           }
-          // Botón convertir Bono a pago real (si ya es bono)
-          if(session && session.role==='admin' && e.paid && e.paymethod==='BONO'){
+          if(e.paid && e.paymethod==='BONO'){
             const rb=document.createElement('button');
             rb.className='btn btn-sm'; rb.style.cssText='background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff';
-            rb.textContent='💵 Cambiar a Pago'; rb.title='Convertir de Bono a pago real';
-            rb.onclick=async()=>{ 
-              rb.disabled=true; rb.textContent='⏳';
-              const r = await quitarBono(num);
-              if(r) { 
-                DATA[num].paymethod='DEF'; 
-                closeD(); 
-                renderCurrent(); 
-                updateStats();
-              }
-              rb.disabled=false;
-            };
+            rb.textContent='💵'; rb.title='Cambiar a pago real';
+            rb.onclick=async()=>{ rb.disabled=true; rb.textContent='⏳'; const r=await quitarBono(num); if(r){DATA[num].paymethod='DEF';renderCurrent();updateStats();} rb.disabled=false; };
             ac.appendChild(rb);
           }
         }
         const db=document.createElement('button');
         db.className='btn btn-red btn-sm'; db.textContent='🗑'; db.onclick=()=>confirmDel(num);
         ac.appendChild(db);
-      }
-    });
+      });
+    }
   }
-  document.getElementById('tinfo').textContent=`${rows.length} registro${rows.length!==1?'s':''}`;
+  document.getElementById('tinfo').textContent=rows.length+' registro'+(rows.length!==1?'s':'');
 }
 function setTF(f,btn){
   tFilter=f;
@@ -2420,9 +2422,12 @@ async function regModal(){
   });
   if(r.ok){
     logChange('register', regNum, {name, seller:session.name});
-    toast(`#${regNum} registrado`+(abonoRaw>0?` — abono ${fmt(abonoRaw)}`:''),'ok');
+    toast('#'+regNum+' registrado'+(abonoRaw>0?' — abono '+fmt(abonoRaw):''),'ok');
     closeR();
-    await loadData(true);
+    renderCurrent();
+    updateStats();
+    // Sync in background with delay
+    setTimeout(() => loadData(true), 2000);
   } else showMsg('rmsg','err',r.error||'Error');
 }
 
@@ -2465,8 +2470,8 @@ async function saveEdit(){
     closeE();
     renderCurrent();
     updateStats();
-    // Sync en background
-    loadData(true);
+    // Sync in background with delay
+    setTimeout(() => loadData(true), 2000);
   }
   else showMsg('emsg','err','Error al guardar');
 }
@@ -2572,7 +2577,7 @@ function resetPayClaim(){
 async function togglePaid(num){
   const newPaid = !DATA[num].paid;
   const r = await updateTicket(num, {paid:newPaid, paymentClaim:false});
-  if(r.ok){logChange('togglePaid',num,DATA[num],newPaid?'→ pagado':'→ pendiente');toast(`#${num} → ${newPaid?'pagado':'pendiente'}`,newPaid?'ok':'');await loadData(true);}
+  if(r.ok){logChange('togglePaid',num,DATA[num],newPaid?'→ pagado':'→ pendiente');toast(`#${num} → ${newPaid?'pagado':'pendiente'}`,newPaid?'ok':'');renderCurrent(); updateStats(); setTimeout(()=>loadData(true),2000);}
   else toast('Error','err');
 }
 async function marcarBono(num){
