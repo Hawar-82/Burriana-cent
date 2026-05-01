@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel JM — El Milagro</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#02040c;--surface:rgba(4,10,24,0.9);
+  --cyan:#00d4ff;--purple:#b44fff;--gold:#d4a820;
+  --green:#00ff96;--red:#ff4466;--blue:#4488ff;
+  --text:#f0f8ff;--text2:#90b8d8;--text3:#3a6080;
+  --border:rgba(0,212,255,0.18);
+}
+body{font-family:'Outfit',sans-serif;min-height:100vh;background:var(--bg);color:var(--text);
+  background-image:radial-gradient(ellipse at 20% 30%,rgba(0,100,200,0.12) 0%,transparent 55%),
+  radial-gradient(ellipse at 80% 70%,rgba(120,0,200,0.1) 0%,transparent 50%)}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+.login-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,0.7)}
+.login-brand{font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;text-align:center;background:linear-gradient(135deg,#00d4ff,#b44fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.25rem}
+.login-sub{text-align:center;color:var(--text3);font-size:.82rem;margin-bottom:1.75rem}
+.login-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);display:block;margin-bottom:.35rem}
+.login-input{width:100%;background:rgba(0,212,255,0.04);border:1.5px solid var(--border);color:var(--text);padding:.75rem 1rem;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;outline:none;transition:.2s;margin-bottom:1rem}
+.login-input:focus{border-color:var(--cyan)}
+.login-btn{width:100%;padding:.85rem;background:linear-gradient(135deg,#0060cc,#00d4ff 50%,#7b00ff);color:#fff;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700;cursor:pointer}
+.login-err{color:var(--red);font-size:.8rem;text-align:center;min-height:1rem;margin-bottom:.5rem}
+
+/* APP */
+#app{display:none;padding:1.5rem;max-width:600px;margin:0 auto}
+.page-header{text-align:center;margin-bottom:2rem}
+.page-brand{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#b44fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.page-sub{color:var(--text3);font-size:.82rem;margin-top:.2rem}
+.btn-refresh{margin-top:.75rem;padding:.45rem 1.1rem;background:rgba(0,212,255,0.08);border:1px solid var(--border);color:var(--cyan);border-radius:8px;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer}
+.btn-refresh:hover{background:rgba(0,212,255,0.15)}
+
+/* Cards */
+.section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;position:relative;overflow:hidden}
+.section::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.section-title{font-family:'Syne',sans-serif;font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:1rem}
+
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.stat-card{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:.9rem;text-align:center}
+.stat-val{font-family:'Space Mono',monospace;font-size:1.6rem;font-weight:700;line-height:1}
+.stat-lbl{font-size:.68rem;color:var(--text3);margin-top:.3rem;text-transform:uppercase;letter-spacing:.08em}
+
+/* Boletas progress */
+.boletas-big{text-align:center;padding:1.25rem 0}
+.boletas-num{font-family:'Space Mono',monospace;font-size:3rem;font-weight:700;color:var(--gold);line-height:1}
+.boletas-lbl{color:var(--text3);font-size:.82rem;margin-top:.3rem}
+.boletas-detail{margin-top:.75rem;font-size:.82rem;color:var(--text2)}
+.progress-wrap{margin-top:1rem}
+.progress-label{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text3);margin-bottom:.35rem}
+.progress-bar{height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden}
+.progress-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--gold),#f5d060);transition:width .6s}
+
+/* Badge boleta */
+.boletas-badges{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.75rem;justify-content:center}
+.badge-boleta{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border:2px solid}
+.badge-used{background:rgba(212,168,32,0.15);border-color:var(--gold)}
+.badge-free{background:rgba(0,255,150,0.1);border-color:var(--green);animation:pulse 2s infinite}
+.badge-pending{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Tabla numeros */
+.num-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.num-table th{text-align:left;color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;padding:.4rem .5rem;border-bottom:1px solid var(--border)}
+.num-table td{padding:.5rem;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+.num-table tr:last-child td{border-bottom:none}
+.pill{display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .6rem;border-radius:20px;font-size:.72rem;font-weight:600}
+.pill-paid{background:rgba(0,255,150,0.1);color:var(--green);border:1px solid rgba(0,255,150,0.2)}
+.pill-abonado{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.2)}
+.pill-pending{background:rgba(255,68,102,0.08);color:var(--red);border:1px solid rgba(255,68,102,0.15)}
+.pill-claimed{background:rgba(240,184,64,0.1);color:#c09020;border:1px solid rgba(240,184,64,0.2)}
+.pill-bono{background:rgba(180,79,255,0.12);color:var(--purple);border:1px solid rgba(180,79,255,0.25)}
+.mono{font-family:'Space Mono',monospace;font-size:.78rem}
+
+/* Loader */
+.loader{display:flex;align-items:center;justify-content:center;padding:2rem;color:var(--text3);font-size:.85rem;gap:.75rem}
+.spin{width:20px;height:20px;border:2px solid rgba(0,212,255,0.2);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">El Milagro</div>
+    <div class="login-sub">📊 Mi Informe Personal</div>
+    <label class="login-label">Contraseña</label>
+    <input type="password" id="lpass" class="login-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="login-err" id="lerr"></div>
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="page-header">
+    <div class="page-brand">Mi Informe</div>
+    <div class="page-sub" id="page-sub">El Milagro — Panel Personal</div>
+    <button class="btn-refresh" onclick="cargarDatos()">🔄 Actualizar</button>
+  </div>
+
+  <!-- RESUMEN VENTAS -->
+  <div class="section">
+    <div class="section-title">📈 Mis Ventas</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="s-total" style="color:var(--cyan)">—</div>
+        <div class="stat-lbl">Reservados</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="s-pagados" style="color:var(--green)">—</div>
+        <div class="stat-lbl">Pagados completo</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="s-abonados" style="color:var(--blue)">—</div>
+        <div class="stat-lbl">Con abono</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="s-recaudado" style="color:var(--gold)">—</div>
+        <div class="stat-lbl">Recaudado (€)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOLETAS GANADAS -->
+  <div class="section">
+    <div class="section-title">🎟 Mis Boletas Ganadas</div>
+    <div class="boletas-big">
+      <div class="boletas-num" id="b-ganadas">—</div>
+      <div class="boletas-lbl">boletas ganadas en total</div>
+      <div class="boletas-detail" id="b-detail"></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Progreso hacia próxima boleta</span>
+        <span id="b-progreso">—</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="b-bar" style="width:0%"></div></div>
+    </div>
+    <div id="b-badges" class="boletas-badges" style="margin-top:1rem"></div>
+    <div style="margin-top:.75rem;font-size:.72rem;color:var(--text3);text-align:center">
+      🏅 Dorado = boleta ya usada (bono) · 🟢 Verde = boleta disponible · ⬜ = por ganar
+    </div>
+  </div>
+
+  <!-- MIS BONOS -->
+  <div class="section">
+    <div class="section-title">🎁 Mis Números Bono</div>
+    <div id="bonos-list"><div class="loader"><div class="spin"></div>Cargando...</div></div>
+  </div>
+
+  <!-- TODOS MIS NÚMEROS -->
+  <div class="section">
+    <div class="section-title">📋 Todos Mis Números</div>
+    <div id="nums-list"><div class="loader"><div class="spin"></div>Cargando...</div></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ksnpmrqdpqjdnqhcfjvl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_CkDbDY89w_YKk8Q7NUC26g_oh-2Sflx';
+const MI_PASS      = 'rifa3910';
+const MI_SELLER    = 'John Alex Marin'; // nombre exacto como aparece en la app
+const TICKET       = 100;
+const POR_BOLETA   = 4; // cada 4 pagados = 1 boleta
+
+const headers = {
+  'Content-Type': 'application/json',
+  'apikey': SUPABASE_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_KEY
+};
+
+function fmt(n) { return (n||0).toLocaleString('es') + ' €'; }
+
+// ── Login ─────────────────────────────────────────────────
+function doLogin() {
+  const pass = document.getElementById('lpass').value;
+  if(pass === MI_PASS) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    cargarDatos();
+  } else {
+    document.getElementById('lerr').textContent = '❌ Contraseña incorrecta';
+    document.getElementById('lpass').value = '';
+  }
+}
+
+// ── Cargar datos ──────────────────────────────────────────
+async function cargarDatos() {
+  document.getElementById('nums-list').innerHTML  = '<div class="loader"><div class="spin"></div>Cargando...</div>';
+  document.getElementById('bonos-list').innerHTML = '<div class="loader"><div class="spin"></div>Cargando...</div>';
+
+  try {
+    // Fetch all my numbers
+    const fields = 'numero,buyer,phone,paid,payment_claim,abonos,abonos_pending,method,fecha';
+    let all = [], from = 0;
+    while(true) {
+      const to = from + 999;
+      const url = SUPABASE_URL + '/rest/v1/ventas?select=' + fields + '&seller=eq.' + encodeURIComponent(MI_SELLER) + '&order=numero.asc';
+      const r = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Range-Unit': 'items',
+          'Range': from + '-' + to
+        }
+      });
+      if(!r.ok) {
+        const errText = await r.text();
+        throw new Error('HTTP ' + r.status + ': ' + errText);
+      }
+      const rows = await r.json();
+      if(!Array.isArray(rows) || rows.length === 0) break;
+      all = all.concat(rows);
+      if(rows.length < 1000) break;
+      from += 1000;
+    }
+
+    calcularStats(all);
+    renderBonos(all);
+    renderTabla(all);
+
+  } catch(e) {
+    const msg = e.message || 'Error desconocido';
+    document.getElementById('nums-list').innerHTML  = '<div class="loader" style="color:var(--red)">❌ ' + msg + '</div>';
+    document.getElementById('bonos-list').innerHTML = '<div class="loader" style="color:var(--red)">❌ ' + msg + '</div>';
+    console.error('Error:', e);
+  }
+}
+
+// ── Calcular estadísticas ─────────────────────────────────
+function calcularStats(rows) {
+  const total    = rows.length;
+  const bonos    = rows.filter(r => r.method === 'BONO');
+  const pagados  = rows.filter(r => r.paid && r.method !== 'BONO');
+  const abonados = rows.filter(r => !r.paid && (r.abonos||0) > 0);
+  const recaudado = pagados.reduce((s,r) => s + TICKET, 0) +
+                    rows.filter(r => !r.paid && r.method !== 'BONO').reduce((s,r) => s + (r.abonos||0), 0);
+
+  document.getElementById('s-total').textContent     = total;
+  document.getElementById('s-pagados').textContent   = pagados.length;
+  document.getElementById('s-abonados').textContent  = abonados.length;
+  document.getElementById('s-recaudado').textContent = recaudado + ' €';
+
+  // Boletas: cada POR_BOLETA pagados (sin bonos) = 1 boleta
+  const boletasGanadas  = Math.floor(pagados.length / POR_BOLETA);
+  const boletasUsadas   = bonos.length;
+  const boletasLibres   = Math.max(0, boletasGanadas - boletasUsadas);
+  const progreso        = pagados.length % POR_BOLETA;
+  const pct             = Math.round((progreso / POR_BOLETA) * 100);
+
+  document.getElementById('b-ganadas').textContent = boletasGanadas;
+  document.getElementById('b-detail').innerHTML =
+    `<span style="color:var(--gold)">🏅 ${boletasUsadas} usada${boletasUsadas!==1?'s':''}</span> &nbsp;·&nbsp; ` +
+    `<span style="color:var(--green)">✅ ${boletasLibres} disponible${boletasLibres!==1?'s':''}</span>`;
+  document.getElementById('b-progreso').textContent = `${progreso} / ${POR_BOLETA} para la próxima`;
+  document.getElementById('b-bar').style.width = pct + '%';
+
+  // Badges visualization
+  const badges = document.getElementById('b-badges');
+  let html = '';
+  // Total badges to show = ganadas + remaining for next
+  const totalShow = boletasGanadas + 1;
+  for(let i = 0; i < totalShow; i++) {
+    if(i < boletasUsadas)        html += '<div class="badge-boleta badge-used" title="Boleta usada (bono)">🏅</div>';
+    else if(i < boletasGanadas)  html += '<div class="badge-boleta badge-free" title="Boleta disponible">🎟</div>';
+    else                          html += '<div class="badge-boleta badge-pending" title="En progreso ('+progreso+'/'+POR_BOLETA+' pagados)">⬜</div>';
+  }
+  badges.innerHTML = html;
+
+  document.getElementById('page-sub').textContent =
+    'El Milagro — ' + total + ' números · Actualizado ' + new Date().toLocaleTimeString('es');
+}
+
+// ── Render bonos ──────────────────────────────────────────
+function renderBonos(rows) {
+  const bonos = rows.filter(r => r.method === 'BONO');
+  const el = document.getElementById('bonos-list');
+  if(!bonos.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);padding:1rem;font-size:.85rem">No tienes números bono aún</div>';
+    return;
+  }
+  el.innerHTML = '<table class="num-table"><thead><tr><th>#</th><th>Nombre</th><th>Fecha</th></tr></thead><tbody>' +
+    bonos.map(r => '<tr>' +
+      '<td><span class="mono">#' + r.numero + '</span></td>' +
+      '<td><b>' + (r.buyer||'—') + '</b></td>' +
+      '<td style="color:var(--text3);font-size:.75rem">' + (r.fecha||'—') + '</td>' +
+      '</tr>').join('') +
+    '</tbody></table>';
+}
+
+// ── Render tabla completa ─────────────────────────────────
+function renderTabla(rows) {
+  const el = document.getElementById('nums-list');
+  if(!rows.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);padding:1rem;font-size:.85rem">Sin números registrados</div>';
+    return;
+  }
+  el.innerHTML = '<table class="num-table"><thead><tr><th>#</th><th>Nombre</th><th>Abonado</th><th>Estado</th></tr></thead><tbody>' +
+    rows.map(r => {
+      const esBono   = r.method === 'BONO';
+      const abonado  = esBono ? '🎁' : r.paid ? TICKET + ' €' : (r.abonos||0) + ' €';
+      let estadoHTML;
+      if(esBono)                        estadoHTML = '<span class="pill pill-bono">🎁 Bono</span>';
+      else if(r.paid)                   estadoHTML = '<span class="pill pill-paid">✅ Pagado</span>';
+      else if(r.payment_claim)          estadoHTML = '<span class="pill pill-claimed">⏳ Reportado</span>';
+      else if((r.abonos||0) > 0)        estadoHTML = '<span class="pill pill-abonado">💰 Abonado</span>';
+      else                              estadoHTML = '<span class="pill pill-pending">❌ Pendiente</span>';
+      return '<tr>' +
+        '<td><span class="mono">#' + r.numero + '</span></td>' +
+        '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>' + (r.buyer||'—') + '</b></td>' +
+        '<td style="font-family:Space Mono,monospace;font-size:.78rem">' + abonado + '</td>' +
+        '<td>' + estadoHTML + '</td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+</script>
+</body>
+</html>
