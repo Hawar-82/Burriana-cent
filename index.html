@@ -1965,7 +1965,11 @@ function updateStats(){
           <button class="btn btn-green btn-sm" onclick="confirmPay('${num}')" style="flex-shrink:0">✓ OK</button>
           <button class="btn btn-red btn-sm"   onclick="rejectPay('${num}')"  style="flex-shrink:0">✗</button>
         </div>`).join('') +
-        (claimedEntries.length>8?`<div style="text-align:center;font-size:.75rem;color:var(--text3);padding:.4rem">...y ${claimedEntries.length-8} más</div>`:'');
+        (claimedEntries.length>8?`<div style="text-align:center;padding:.5rem">
+          <button onclick="toggleClaimsList()"
+            style="width:100%;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:8px;padding:.4rem .85rem;font-family:Outfit,sans-serif;font-size:.75rem;font-weight:600;cursor:pointer">
+            ${window._claimsExpanded ? '▲ Ver menos' : '▼ Ver todos — ' + claimedEntries.length + ' pendientes'}
+          </button></div>`:'');
     } else {
       banner.style.display='none';
     }
