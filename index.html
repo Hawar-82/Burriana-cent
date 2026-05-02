@@ -1071,6 +1071,10 @@ tr:hover td{background:var(--surface2)}
           <button class="chip"     data-gf="abonado" onclick="setGF('abonado',this)">💰 Abonado</button>
           <button class="chip"     data-gf="claimed" onclick="setGF('claimed',this)">Pago reportado</button>
           <button class="chip"     data-gf="unpaid"  onclick="setGF('unpaid',this)">Pendiente</button>
+          <button id="btn-ver-abonos" class="chip" onclick="toggleClaimsList()"
+            style="display:none;background:rgba(240,184,64,0.15);border-color:rgba(240,184,64,0.4);color:#c09020;font-weight:700">
+            ⏳ Ver pendientes (<span id="btn-abonos-cnt">0</span>)
+          </button>
           <div class="send"><input id="gs" type="text" inputmode="numeric" maxlength="4"
             placeholder="Buscar #…" oninput="gPage=0;renderGrid()"></div>
         </div>
@@ -2031,6 +2035,16 @@ function updateStats(){
     setT('fp-abonos',    fmtE(totalAbonos));
     setT('fp-total',     fmtE(totalRecaudado));
     setT('fp-bono',      totalBonos + ' número' + (totalBonos!==1?'s':''));
+    // Show pending claims button for admin
+    if(session && session.role==='admin'){
+      const btnAbonos = document.getElementById('btn-ver-abonos');
+      const btnCnt    = document.getElementById('btn-abonos-cnt');
+      if(btnAbonos){
+        const claimCount = Object.values(DATA).filter(e=>e.paymentClaim&&!e.paid).length;
+        btnAbonos.style.display = claimCount > 0 ? '' : 'none';
+        if(btnCnt) btnCnt.textContent = claimCount;
+      }
+    }
     setT('fp-pending',   fmtE(totalPending));
     setT('fp-goal',      fmtE(goal));
     setT('fp-pct',       pct + '%');
