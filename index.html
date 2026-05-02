@@ -1956,7 +1956,8 @@ function updateStats(){
     cnt.textContent=claimedEntries.length;
     if(claimedEntries.length>0){
       banner.style.display='block';
-      list.innerHTML=claimedEntries.slice(0,8).map(([num,e])=>`
+      const claimsLimit = window._claimsExpanded ? claimedEntries.length : 8;
+      list.innerHTML=claimedEntries.slice(0,claimsLimit).map(([num,e])=>`
         <div class="pending-item">
           <span class="pending-num">#${num}</span>
           <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${e.name}</span>
@@ -2491,6 +2492,11 @@ async function saveEdit(){
 }
 
 // ── CONFIRM / REJECT PAYMENT (admin) ──────────────────────
+function toggleClaimsList() {
+  window._claimsExpanded = !window._claimsExpanded;
+  updateStats(); // re-render claims with new limit
+}
+
 async function confirmPay(num){
   const r = await updateTicket(num, {paid:true, paymentClaim:false});
   if(r.ok){logChange('confirmPay',num,DATA[num]);toast(`#${num} ✅ pago confirmado`,'ok');await loadData(true);}
