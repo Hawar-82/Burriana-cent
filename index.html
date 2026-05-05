@@ -21,10 +21,7 @@
   --r:10px;
   --fs-base:15px;
 }
-body {
-  background:#02040c;
-  font-size:var(--fs-base);
-}
+
 /* Animated background orbs */
 body::before {
   content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
@@ -45,7 +42,7 @@ body::after {
   mask-image:radial-gradient(ellipse at center, black 30%, transparent 75%);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden;font-size:15px;line-height:1.5}
+body{color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden;font-size:15px;line-height:1.5}
 
 /* LOGIN */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
@@ -80,7 +77,7 @@ select option{background:var(--surface2)}
   font-size:.95rem;font-weight:600;cursor:pointer;transition:all .18s;white-space:nowrap}
 .btn-full{width:100%}
 .btn-gold{background:linear-gradient(135deg,#0060cc,#00d4ff 50%,#7b00ff);color:#fff;box-shadow:0 4px 20px rgba(0,212,255,0.3)}
-.btn-gold:hover{background:#f5c840;transform:translateY(-1px)}
+.btn-gold:hover{filter:brightness(1.15);transform:translateY(-1px)}
 .btn-ghost{background:transparent;border:1.5px solid var(--border2);color:var(--text2)}
 .btn-ghost:hover{border-color:var(--text2);color:var(--text)}
 .btn-red{background:var(--red);color:#fff} .btn-red:hover{background:#c04040}
@@ -287,8 +284,7 @@ tr:hover td{background:var(--surface2)}
 /* Pending approvals panel */
 .pending-banner{
   background:rgba(240,184,64,0.08);border:1.5px solid rgba(240,184,64,0.3);
-  border-radius:10px;padding:1rem;margin-bottom:1.25rem;display:none;
-;overflow:visible}
+  border-radius:10px;padding:1rem;margin-bottom:1.25rem;display:none;overflow:visible}
 .pending-banner-title{
   font-family:'Syne',sans-serif;font-size:.82rem;font-weight:700;
   text-transform:uppercase;letter-spacing:.08em;color:var(--gold);
@@ -645,9 +641,7 @@ tr:hover td{background:var(--surface2)}
 
 <!-- OFFLINE BANNER -->
 <div id="offline-banner">
-  ⚠️ Sin conexión — los cambios se guardan localmente
-  <span id="offline-queue-count"></span>
-  y se sincronizarán al recuperar la conexión
+  ⚠️ Sin conexión — los cambios no se guardarán hasta recuperar la conexión
 </div>
 
 <!-- DELETE CONFIRM MODAL -->
@@ -1007,7 +1001,7 @@ tr:hover td{background:var(--surface2)}
       <!-- QUICK SEARCH -->
       <div>
         <div class="phdr">🔍 Búsqueda rápida</div>
-        <input type="text" id="qsi2" placeholder="Número, nombre, colaborador…" oninput="quickSearch()">
+        <input type="text" id="qsi2" placeholder="Número, nombre, colaborador…" oninput="debounce(quickSearch,150)()">
         <div class="qsr" id="qsr"></div>
       </div>
 
@@ -1354,14 +1348,25 @@ async function sbPatch(table, filter, data) {
 }
 
 async function sbUpsert(table, data) {
+  // Usar resolution=ignore-duplicates para evitar sobrescribir si otro colaborador
+  // ya vendió el mismo número (race condition). Si hay conflicto → error 409.
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
-    headers: { ...headers, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+    headers: { ...headers, 'Prefer': 'resolution=ignore-duplicates,return=representation' },
     body: JSON.stringify(data)
   });
   if(!r.ok) {
-    const err = await r.text();
-    return { ok: false, error: err };
+    const body = await r.text();
+    // 409 o respuesta vacía con ignore-duplicates = número ya vendido
+    if(r.status === 409 || (r.status === 200 && body === '[]') || body === '[]') {
+      return { ok: false, conflict: true, error: 'Este número ya fue vendido por otro colaborador' };
+    }
+    return { ok: false, error: body };
+  }
+  // Con ignore-duplicates, si el registro ya existe devuelve array vacío (no es error)
+  const body = await r.text();
+  if(body === '[]' || body === '') {
+    return { ok: false, conflict: true, error: 'Este número ya fue vendido por otro colaborador' };
   }
   return { ok: true };
 }
@@ -1385,8 +1390,6 @@ async function loginCheck(user, pass, mode) {
 
 // ── Data ──────────────────────────────────────────────────
 // Cache timestamp for smart sync
-let _lastSyncTime = null;
-let _cachedData = null;
 
 async function loadDataFromDB() {
   const obj = {};
@@ -1494,8 +1497,18 @@ const pad = n => String(n).padStart(4,'0');
 let DATA={}, session=null, gFilter='all', tFilter='all', gPage=0, curView='grid';
 let editNum=null, regNum=null;
 const PG=400;
+// ── ESCAPE HTML (prevención XSS) ──────────────────────────
+function esc(str){
+  if(!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
 let isOnline = true;
-const BACKUP_KEY = 'rifa_backup_date';
 
 // ── UTILS ─────────────────────────────────────────────────
 function toast(msg, type=''){
@@ -1518,7 +1531,9 @@ function setDot(state){
     d.title=state==='off'?'Sin conexión':state==='loading'?'Cargando…':'Conectado';
   });
 }
+const debounce=(fn,ms=200)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);}};
 const fmt = n => Number(n||0).toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:0});
+function esc(s){ const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
 
 function updateAbonoHint(inputId, hintId){
   const val  = parseInt(document.getElementById(inputId)?.value||'0')||0;
@@ -1635,19 +1650,25 @@ function launchApp(){
     document.getElementById('hname-s').textContent = session.name;
   }
 
-  setInterval(smartSync, 300000);
+  if(window._syncInterval) clearInterval(window._syncInterval);
+  window._syncInterval = setInterval(smartSync, 300000);
   isOnline = navigator.onLine;
   updateOfflineBanner();
 }
 
 function logout(){
+  if(window._syncInterval) clearInterval(window._syncInterval);
   session=null; DATA={};
+  gFilter='all'; tFilter='all'; gPage=0; curView='grid';
+  loginMode='seller'; setMode('seller');
   document.getElementById('app').style.display='none';
   document.getElementById('seller-app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('inp-sn').value='';
   document.getElementById('inp-sc').value='';
   document.getElementById('inp-ap').value='';
+  loginMode='seller'; setMode('seller');
+  gFilter='all'; tFilter='all'; gPage=0; curView='grid';
 }
 
 // ── LOAD DATA ─────────────────────────────────────────────
@@ -1758,9 +1779,15 @@ async function submitSellerForm(){
     resetSellerForm(true);
     renderCurrent();
     updateStats();
-    // Sync in background with delay to avoid race condition
     setTimeout(() => loadData(true), 2000);
-  } else showMsg('sf-msg','err', r.error||'Error al guardar');
+  } else {
+    if(r.conflict){
+      await loadData(true);
+      showMsg('sf-msg','err', `⚠️ #${num} ya fue vendido por otro colaborador`);
+    } else {
+      showMsg('sf-msg','err', r.error||'Error al guardar');
+    }
+  }
 }
 function renderMySales(){
   const el=document.getElementById('my-sales-list');
@@ -1803,7 +1830,7 @@ function renderMySales(){
     const metodo = e.paymethod==='DEF'?'💵 ':e.paymethod==='EB'?'🏦 ':'';
     return `<div class="my-sale-row" onclick="openSD('${num}')">
       <span class="my-sale-num">#${num}</span>
-      <span class="my-sale-name">${metodo}${e.name}</span>
+      <span class="my-sale-name">${metodo}${esc(e.name)}</span>
       <span class="my-sale-badge" style="${badgeCls}">${badgeTxt}</span>
     </div>`;
   }).join('') + `<div style="font-size:.7rem;color:var(--text3);text-align:right;margin-top:.35rem;padding-right:.25rem">* pendiente de confirmar por admin</div>`;
@@ -1973,8 +2000,8 @@ function updateStats(){
       list.innerHTML=claimedEntries.slice(0,8).map(([num,e])=>`
         <div class="pending-item">
           <span class="pending-num">#${num}</span>
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${e.name}</span>
-          <span style="color:var(--text3);font-size:.74rem;margin:0 .4rem">${e.seller}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${esc(e.name)}</span>
+          <span style="color:var(--text3);font-size:.74rem;margin:0 .4rem">${esc(e.seller)}</span>
           <button class="btn btn-green btn-sm" onclick="confirmPay('${num}')" style="flex-shrink:0">✓ OK</button>
           <button class="btn btn-red btn-sm"   onclick="rejectPay('${num}')"  style="flex-shrink:0">✗</button>
         </div>`).join('') +
@@ -1994,7 +2021,7 @@ function updateStats(){
       abList.innerHTML = abonoEntries.slice(0,8).map(([num,e])=>`
         <div class="abono-pending-item">
           <span class="pending-num">#${num}</span>
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${e.name}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${esc(e.name)}</span>
           <span style="color:var(--green);font-family:'Space Mono',monospace;font-size:.8rem;flex-shrink:0">
             +${fmt(e.abonosPending)}
           </span>
@@ -2068,7 +2095,10 @@ function renderGrid(){
   _gridRenderPending = true;
   requestAnimationFrame(() => {
     _gridRenderPending = false;
-    const items = gridItems();
+    const allItems = gridItems();
+    const totalPages = Math.ceil(allItems.length / PG) || 1;
+    if(gPage >= totalPages) gPage = 0;
+    const items = allItems.slice(gPage * PG, (gPage + 1) * PG);
     const grid = document.getElementById('ngrid');
     const html = items.map(num => {
       const e = DATA[num];
@@ -2087,7 +2117,7 @@ function renderGrid(){
       const num = cell.dataset.num;
       if(DATA[num]) openD(num); else openR(num);
     };
-    document.getElementById('pgrid').innerHTML = '';
+    renderPg('pgrid', totalPages, allItems.length);
   });
 }
 
@@ -2156,9 +2186,9 @@ function renderTable(){
       const rowBg = e.paymentClaim&&!e.paid ? 'rgba(240,184,64,0.04)' : abonado>0&&!e.paid ? 'rgba(80,200,140,0.04)' : '';
       const adminCell = isAdmin ? '<td class="acell" data-num="'+num+'" style="display:flex"></td>' : '<td></td>';
       return '<tr style="background:'+rowBg+'"><td><span class="mono">#'+num+'</span></td>'
-        +'<td><strong>'+e.name+'</strong></td>'
+        +'<td><strong>'+esc(e.name)+'</strong></td>'
         +'<td style="color:var(--text2)">'+e.phone+'</td>'
-        +'<td><span class="pill ps">'+e.seller+'</span></td>'
+        +'<td><span class="pill ps">'+esc(e.seller)+'</span></td>'
         +'<td>'+payBadge(e)+'</td>'
         +'<td>'+abonoCell+'</td>'
         +'<td style="color:var(--text3);font-size:.78rem">'+(e.date||'')+'</td>'
@@ -2284,85 +2314,18 @@ async function submitSale(){
     toast(`#${num} vendido a ${name}`,'ok');
     await loadData(true);
   } else {
-    showMsg('fmsg','err', r.error||'Error al guardar');
+    if(r.conflict) {
+      // Actualizar DATA para reflejar la realidad
+      await loadData(true);
+      showMsg('fmsg','err', `⚠️ #${num} ya fue vendido por otro colaborador. Los datos se han actualizado.`);
+    } else {
+      showMsg('fmsg','err', r.error||'Error al guardar');
+    }
   }
 }
 
 // Tokens en memoria de sesión
-function getSellerToken(){ return session?.token || ''; }
-function getAdminToken(){  return session?.token || ''; }
-function getToken(){       return session?.token || ''; }
 
-// ── MODALS ──────────────────────────────────────────────────
-// ── ABONO BLOCK (inside detail modal) ─────────────────────
-function abonoBlock(num, e){
-  if(e.paid) return ''; // pagado completo — no mostrar
-  const abonado  = e.abonos || 0;
-  const pending  = e.abonosPending || 0;
-  const saldo    = Math.max(0, TICKET - abonado);
-  const pct      = Math.min(100, Math.round(abonado / TICKET * 100));
-  const isAdmin  = session && session.role === 'admin';
-
-  let pendingAlert = '';
-  if(pending > 0){
-    if(isAdmin){
-      pendingAlert = `
-        <div style="background:rgba(80,200,140,.08);border:1px solid rgba(80,200,140,.25);border-radius:8px;padding:.6rem .85rem;font-size:.8rem;color:var(--green);margin-top:.4rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
-          <span>💰 Abono pendiente: <b>${fmt(pending)}</b></span>
-          <div style="display:flex;gap:.35rem">
-            <button class="btn btn-green btn-sm" onclick="confirmAbono('${num}')">✓ Confirmar</button>
-            <button class="btn btn-red btn-sm"   onclick="rejectAbono('${num}')">✗</button>
-          </div>
-        </div>`;
-    } else {
-      pendingAlert = `
-        <div style="background:rgba(80,200,140,.08);border:1px solid rgba(80,200,140,.25);border-radius:8px;padding:.55rem .85rem;font-size:.8rem;color:var(--green);margin-top:.4rem">
-          🕐 Abono de <b>${fmt(pending)}</b> reportado — pendiente de confirmación
-        </div>`;
-    }
-  }
-
-  const inputZone = isAdmin ? `
-    <div style="margin-top:.65rem">
-      <div style="font-size:.72rem;color:var(--text3);margin-bottom:.3rem">Editar total abonado (admin):</div>
-      <div style="display:flex;gap:.4rem">
-        <input id="abono-admin-inp-${num}" type="text" inputmode="numeric"
-          value="${abonado}"
-          style="flex:1;font-family:'Space Mono',monospace;font-size:.85rem;background:var(--surface3);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:.35rem .6rem;outline:none">
-        <button class="btn btn-gold btn-sm" onclick="setAbonoAdmin('${num}')">Guardar</button>
-      </div>
-    </div>` : `
-    <div style="margin-top:.65rem">
-      <div style="font-size:.72rem;color:var(--text3);margin-bottom:.3rem">Reportar abono:</div>
-      <div style="display:flex;gap:.4rem">
-        <input id="abono-inp-${num}" type="text" inputmode="numeric" placeholder="Valor del abono"
-          style="flex:1;font-family:'Space Mono',monospace;font-size:.85rem;background:var(--surface3);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:.35rem .6rem;outline:none"
-          ${pending > 0 ? 'disabled title="Ya tienes un abono pendiente de confirmación"' : ''}>
-        <button class="btn btn-green btn-sm" onclick="reportAbono('${num}')" ${pending > 0 ? 'disabled' : ''}>+ Abonar</button>
-      </div>
-      ${pending > 0 ? '' : `<div style="font-size:.7rem;color:var(--text3);margin-top:.2rem">Saldo por abonar: ${fmt(saldo)}</div>`}
-    </div>`;
-
-  return `
-    <div class="abono-bar">
-      <div class="abono-bar-title">💰 Abonos</div>
-      <div class="abono-progress"><div class="abono-progress-fill" style="width:${pct}%"></div></div>
-      <div class="abono-row">
-        <span class="lbl">Precio del billete</span>
-        <span class="val">${fmt(TICKET)}</span>
-      </div>
-      <div class="abono-row">
-        <span class="lbl">Total abonado</span>
-        <span class="val" style="color:var(--green)">${fmt(abonado)}</span>
-      </div>
-      <div class="abono-row">
-        <span class="lbl">Saldo pendiente</span>
-        <span class="val" style="color:${saldo > 0 ? 'var(--red)' : 'var(--green)'}">${fmt(saldo)}</span>
-      </div>
-      ${pendingAlert}
-      ${inputZone}
-    </div>`;
-}
 
 function openD(num){
   const e=DATA[num];
@@ -2373,9 +2336,9 @@ function openD(num){
   else                  { titleTxt='⏳ Pendiente';          stateBadge=`<span class="pill pu">⏳ Pendiente</span>`; }
   document.getElementById('dtitle').textContent=titleTxt;
   document.getElementById('dbody').innerHTML=`
-    <div class="drow"><span class="dk">Nombre</span><span class="dv">${e.name}</span></div>
-    <div class="drow"><span class="dk">Teléfono</span><span class="dv">${e.phone}</span></div>
-    <div class="drow"><span class="dk">Colaborador</span><span class="dv">${e.seller}</span></div>
+    <div class="drow"><span class="dk">Nombre</span><span class="dv">${esc(e.name)}</span></div>
+    <div class="drow"><span class="dk">Teléfono</span><span class="dv">${esc(e.phone)}</span></div>
+    <div class="drow"><span class="dk">Colaborador</span><span class="dv">${esc(e.seller)}</span></div>
     <div class="drow"><span class="dk">Estado</span><span class="dv">${stateBadge}</span></div>
     <div class="drow"><span class="dk">Método pago</span><span class="dv">${
       e.paymethod==='DEF'  ? '💵 DEF' :
@@ -2464,9 +2427,15 @@ async function regModal(){
     closeR();
     renderCurrent();
     updateStats();
-    // Sync in background with delay
     setTimeout(() => loadData(true), 2000);
-  } else showMsg('rmsg','err',r.error||'Error');
+  } else {
+    if(r.conflict){
+      await loadData(true);
+      showMsg('rmsg','err', `⚠️ #${regNum} ya fue vendido por otro colaborador`);
+    } else {
+      showMsg('rmsg','err', r.error||'Error');
+    }
+  }
 }
 
 function openE(num){
@@ -2733,7 +2702,7 @@ function quickSearch(){
     return `
       <div class="qsi" onclick="closeQsr();openD('${num}')">
         <span style="font-family:'Space Mono',monospace;color:var(--gold);font-weight:700">#${num}</span>
-        <span style="margin-left:.5rem">${e.name}</span>
+        <span style="margin-left:.5rem">${esc(e.name)}</span>
         ${badge}
         <div style="color:var(--text3);font-size:.74rem;margin-top:2px">${e.seller||''}</div>
       </div>`;
@@ -2852,7 +2821,7 @@ function exportPDF(){
       </div>
       <div class="print-stats">
         <div class="pstat gold"><div class="pv">${sold.toLocaleString()}</div><div class="pl">Reservados</div></div>
-        <div class="pstat"><div class="pv">${(9999-sold).toLocaleString()}</div><div class="pl">Disponibles</div></div>
+        <div class="pstat"><div class="pv">${(10000-sold).toLocaleString()}</div><div class="pl">Disponibles</div></div>
         <div class="pstat green"><div class="pv">${paid.toLocaleString()}</div><div class="pl">Pagados</div></div>
         ${bonos>0?`<div class="pstat" style="border-color:#c9a0f0"><div class="pv" style="color:#7a3ab4">${bonos}</div><div class="pl">Bonos</div></div>`:''}
         <div class="pstat" style="border-color:#e0c040"><div class="pv" style="color:#a07000">${claimed.toLocaleString()}</div><div class="pl">Reportados</div></div>
@@ -3015,21 +2984,41 @@ async function confirmImport(){
     toast(`${newSellers.length} colaborador${newSellers.length!==1?'es':''} creado${newSellers.length!==1?'s':''}`, 'ok');
   }
 
-  // Importar tickets
+  // Importar tickets — batch UPSERT (mucho más rápido que 1 por 1)
   let ok=0, fail=0;
-  for(const entry of importData){
-    try{
-      await saveTicket(entry.num, {
-        name:entry.name, phone:entry.phone, seller:entry.seller,
-        paid:entry.paid, paymentClaim:false,
-        abonos: entry.paid ? TICKET : 0,
-        abonosPending: 0,
-        paymethod: '',
-        date:entry.date
+  const BATCH = 50; // 50 registros por request
+  for(let i=0; i<importData.length; i+=BATCH){
+    const chunk = importData.slice(i, i+BATCH);
+    const rows = chunk.map(entry => ({
+      numero: entry.num,
+      buyer:  entry.name,
+      phone:  entry.phone,
+      seller: entry.seller,
+      paid:   entry.paid,
+      payment_claim: false,
+      abonos: entry.paid ? TICKET : 0,
+      abonos_pending: 0,
+      method: '',
+      fecha:  entry.date
+    }));
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/ventas`, {
+        method: 'POST',
+        headers: { ...headers, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(rows)
       });
-      ok++;
-    } catch(e){ fail++; }
-    await new Promise(r=>setTimeout(r,100));
+      if(r.ok) ok += chunk.length;
+      else { fail += chunk.length; console.error('Batch error:', await r.text()); }
+    } catch(e){ fail += chunk.length; }
+    // Actualizar DATA local también
+    chunk.forEach(entry => {
+      DATA[entry.num] = {
+        name: entry.name, phone: entry.phone, seller: entry.seller,
+        paid: entry.paid, paymentClaim: false,
+        abonos: entry.paid ? TICKET : 0, abonosPending: 0,
+        paymethod: '', date: entry.date
+      };
+    });
   }
 
   btn.disabled=false;
@@ -3078,7 +3067,7 @@ function renderSellersList(){
   el.innerHTML = SELLERS.map((s,i)=>`
     <div class="seller-item">
       <div>
-        <div style="font-weight:600;font-size:.88rem">👤 ${s.name}</div>
+        <div style="font-weight:600;font-size:.88rem">👤 ${esc(s.name)}</div>
         <div style="font-size:.74rem;color:var(--text3);margin-top:1px">
           ${s.phone ? `📞 <span style="color:var(--text2)">${s.phone}</span> &nbsp;·&nbsp; ` : ''}
           usuario: <span style="color:var(--blue);font-family:monospace">${s.user}</span>
@@ -3263,11 +3252,7 @@ function updateOfflineBanner(){
   if(banner) banner.classList.toggle('show', !isOnline);
 }
 
-async function triggerAutoBackup(){
-  const hoy = new Date().toDateString();
-  localStorage.setItem(BACKUP_KEY, hoy);
-  exportCSV(/*auto=*/true);
-}
+
 
 // ══════════════════════════════════════════════════════════
 
@@ -3375,8 +3360,13 @@ function exportLibresPDF(){
   toast('Descargado — ábrelo e imprime como PDF','ok');
 }
 
-function exportCSV(auto=false){
+function exportCSV(){
   const rows=[['Número','Nombre','Teléfono','Colaborador','Estado pago','Método pago','Abonado','Pendiente abono','Saldo','Fecha']];
+  const csvSafe = v => {
+    const s = String(v||'');
+    const safe = /^[=+\-@]/.test(s) ? "'" + s : s;
+    return '"' + safe.replace(/"/g,'""') + '"';
+  };
   Object.entries(DATA).sort(([a],[b])=>a.localeCompare(b)).forEach(([num,e])=>{
     const abonado = e.abonos||0;
     const pending = e.abonosPending||0;
@@ -3385,7 +3375,7 @@ function exportCSV(auto=false){
     const metodo  = e.paymethod==='DEF'?'DEF' : e.paymethod==='EB'?'EB' : '';
     rows.push([num, e.name, e.phone, e.seller, estado, metodo, abonado, pending, saldo, e.date||'']);
   });
-  const csv=rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const csv=rows.map(r=>r.map(csvSafe).join(',')).join('\n');
   const a=document.createElement('a');
   const suffix = auto ? '_backup_auto' : '';
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
@@ -3586,12 +3576,7 @@ function filtrarDisponibles(q){
   renderDisponibles(filtered);
 }
 
-function filterDisponibles(val){
-  const q = val.trim();
-  if(!q){ renderDisponibles(_allDisponibles); return; }
-  const filtered = _allDisponibles.filter(n => n.includes(q));
-  renderDisponibles(filtered);
-}
+
 
 function renderDisponibles(lista){
   const container = document.getElementById('disp-list');
