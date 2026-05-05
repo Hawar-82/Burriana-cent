@@ -3387,7 +3387,7 @@ function exportLibresPDF(){
   toast('Descargado — ábrelo e imprime como PDF','ok');
 }
 
-function exportCSV(){
+function exportCSV(auto=false){
   const rows=[['Número','Nombre','Teléfono','Colaborador','Estado pago','Método pago','Abonado','Pendiente abono','Saldo','Fecha']];
   const csvSafe = v => {
     const s = String(v||'');
