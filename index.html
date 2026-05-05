@@ -926,7 +926,7 @@ tr:hover td{background:var(--surface2)}
           <span>⏳ Reportados — pendientes de confirmar</span>
           <div style="display:flex;align-items:center;gap:.4rem">
             <span id="pending-count" style="background:var(--gold);color:#0d0e14;border-radius:20px;padding:.1rem .55rem;font-size:.75rem">0</span>
-            <button id="btn-ver-todos" onclick="toggleClaimsList()"
+            <button onclick="toggleClaimsList()"
               style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;border-radius:6px;padding:.15rem .5rem;font-family:'Outfit',sans-serif;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap">
               Ver todos
             </button>
@@ -1494,6 +1494,8 @@ const pad = n => String(n).padStart(4,'0');
 let DATA={}, session=null, gFilter='all', tFilter='all', gPage=0, curView='grid';
 let editNum=null, regNum=null;
 const PG=400;
+let isOnline = true;
+const BACKUP_KEY = 'rifa_backup_date';
 
 // ── UTILS ─────────────────────────────────────────────────
 function toast(msg, type=''){
@@ -1968,19 +1970,7 @@ function updateStats(){
     cnt.textContent=claimedEntries.length;
     if(claimedEntries.length>0){
       banner.style.display='block';
-      const claimsLimit = window._claimsExpanded ? claimedEntries.length : 8;
-      // Show/update toggle button
-      const toggleWrap = document.getElementById('pending-toggle-wrap');
-      const toggleBtn  = document.getElementById('claims-toggle-btn');
-      if(claimedEntries.length > 8) {
-        toggleWrap.style.display = 'block';
-        toggleBtn.textContent = window._claimsExpanded
-          ? '▲ Ver menos'
-          : '▼ Ver todos — ' + claimedEntries.length + ' pendientes';
-      } else {
-        toggleWrap.style.display = 'none';
-      }
-      list.innerHTML=claimedEntries.slice(0,claimsLimit).map(([num,e])=>`
+      list.innerHTML=claimedEntries.slice(0,8).map(([num,e])=>`
         <div class="pending-item">
           <span class="pending-num">#${num}</span>
           <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${e.name}</span>
@@ -3265,8 +3255,13 @@ function clearChangelog(){
 // ── PROTECCIÓN 2: MODO OFFLINE + COLA DE SINCRONIZACIÓN ───
 // ══════════════════════════════════════════════════════════
 
-window.addEventListener('online',  ()=>{ isOnline=true;  setDot('on'); });
-window.addEventListener('offline', ()=>{ isOnline=false; setDot('off'); toast('Sin conexión','err'); });
+window.addEventListener('online',  ()=>{ isOnline=true;  setDot('on'); updateOfflineBanner(); });
+window.addEventListener('offline', ()=>{ isOnline=false; setDot('off'); toast('Sin conexión','err'); updateOfflineBanner(); });
+
+function updateOfflineBanner(){
+  const banner = document.getElementById('offline-banner');
+  if(banner) banner.classList.toggle('show', !isOnline);
+}
 
 async function triggerAutoBackup(){
   const hoy = new Date().toDateString();
@@ -3651,6 +3646,7 @@ function seleccionarDisponible(num){
     <div id="disp-list" style="padding:.75rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px;overflow-y:auto;flex:1;max-height:60vh"></div>
   </div>
 </div>
+
 
 <!-- CLAIMS FULL MODAL -->
 <div id="claims-modal" onclick="if(event.target===this)closeClaimsModal()"
