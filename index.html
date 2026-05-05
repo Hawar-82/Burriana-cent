@@ -1973,19 +1973,10 @@ function updateStats(){
     cnt.textContent=claimedEntries.length;
     if(claimedEntries.length>0){
       banner.style.display='block';
-      const claimsLimit = window._claimsExpanded ? claimedEntries.length : 8;
-      // Show/update toggle button
-      const toggleWrap = document.getElementById('pending-toggle-wrap');
-      const toggleBtn  = document.getElementById('claims-toggle-btn');
-      if(claimedEntries.length > 8) {
-        toggleWrap.style.display = 'block';
-        toggleBtn.textContent = window._claimsExpanded
-          ? '▲ Ver menos'
-          : '▼ Ver todos — ' + claimedEntries.length + ' pendientes';
-      } else {
-        toggleWrap.style.display = 'none';
-      }
-      list.innerHTML=claimedEntries.slice(0,claimsLimit).map(([num,e])=>`
+      // Show "Ver lista completa" button if more than 8
+      const showAll = document.getElementById('pending-show-all');
+      if(showAll) showAll.style.display = claimedEntries.length > 8 ? 'block' : 'none';
+      list.innerHTML=claimedEntries.slice(0,8).map(([num,e])=>`
         <div class="pending-item">
           <span class="pending-num">#${num}</span>
           <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${e.name}</span>
