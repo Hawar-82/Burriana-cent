@@ -379,6 +379,10 @@ tr:hover td{background:var(--surface2)}
           <button class="btn btn-ghost btn-full" onclick="exportCSV()">📊 Descargar CSV</button>
           <button class="btn btn-ghost btn-full" onclick="exportLibresPDF()">📄 Números libres PDF</button>
           <button class="btn btn-ghost btn-sm" onclick="loadData()" title="Actualizar datos" style="align-self:flex-end">↻ Actualizar</button>
+          <button class="btn btn-full" onclick="openReportModal()"
+            style="background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(180,79,255,0.2));border:1.5px solid var(--gold);color:var(--gold);font-weight:700">
+            📋 Mi Reporte de Actividad
+          </button>
         </div>
       </div>
 
@@ -492,6 +496,36 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- REPORT MODAL -->
+<div class="full-modal" id="report-modal" onclick="if(event.target===this)closeReportModal()">
+  <div class="full-modal-box" style="max-width:640px">
+    <div class="full-modal-head">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--gold)">📋 Mi Reporte de Actividad</div>
+        <div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">
+          Confirmaciones registradas por ti · <span style="color:#f0b840">⚠️ Descarga el PDF al final de cada jornada</span>
+        </div>
+      </div>
+      <button onclick="closeReportModal()" class="xbtn">✕</button>
+    </div>
+    <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+      <div style="font-size:.8rem;color:var(--text2)">Filtrar por fecha:</div>
+      <input type="date" id="report-date-from" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.35rem .6rem;border-radius:6px;font-family:'Outfit',sans-serif;font-size:.82rem;outline:none">
+      <div style="font-size:.8rem;color:var(--text3)">hasta</div>
+      <input type="date" id="report-date-to" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.35rem .6rem;border-radius:6px;font-family:'Outfit',sans-serif;font-size:.82rem;outline:none">
+      <button class="btn btn-ghost btn-sm" onclick="setReportToday()">Hoy</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadReportData()">🔍 Filtrar</button>
+    </div>
+    <div id="report-modal-list" class="full-modal-list" style="padding:1rem 1.25rem"></div>
+    <div class="full-modal-foot" style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button onclick="closeReportModal()" class="btn btn-ghost btn-sm" style="flex:1">Cerrar</button>
+      <button onclick="exportReportCSV()" class="btn btn-ghost btn-sm" style="flex:1;border-color:var(--green);color:var(--green)">📊 CSV</button>
+      <button onclick="exportReportPDF()" class="btn btn-gold btn-sm" style="flex:2">📄 Descargar PDF</button>
+      <button onclick="clearCoordLog()" class="btn btn-red btn-sm" style="flex:1" title="Borrar historial">🗑</button>
+    </div>
+  </div>
+</div>
+
 <!-- PRINT -->
 <div id="print-area"></div>
 <div class="tstack" id="tstack"></div>
@@ -500,8 +534,48 @@ tr:hover td{background:var(--surface2)}
 // ── CONFIG ────────────────────────────────────────────────
 const SUPABASE_URL  = 'https://ksnpmrqdpqjdnqhcfjvl.supabase.co';
 const SUPABASE_KEY  = 'sb_publishable_CkDbDY89w_YKk8Q7NUC26g_oh-2Sflx';
-const COORD_PASSES  = { 'Coordinador1': 'Milagro@coord1@' }; // añadir más aquí si se necesita
+const COORD_PASSES  = {
+  'Coordinador1': 'Milagro@coord1@',
+  'Coordinador2': 'Burriana@coord2@',
+  'Coordinador3': 'Centro@coord3@',
+  'Coordinador4': 'Rifa@coord4@'
+};
 const TICKET        = 100;
+
+// ── LOG DE ACTIVIDAD DEL COORDINADOR ─────────────────────
+// Guardado en localStorage del navegador
+const LOG_KEY = 'coord_activity_log';
+const LOG_MAX = 2000;
+
+function logCoordAction(accion, num, monto, buyer, seller){
+  if(!session) return;
+  try {
+    const log = JSON.parse(localStorage.getItem(LOG_KEY)||'[]');
+    log.unshift({
+      coordinator: session.name,
+      numero: num,
+      accion: accion,
+      monto: monto || 0,
+      buyer: buyer || '',
+      seller: seller || '',
+      confirmed_at: new Date().toISOString()
+    });
+    if(log.length > LOG_MAX) log.splice(LOG_MAX);
+    localStorage.setItem(LOG_KEY, JSON.stringify(log));
+  } catch(e){ console.warn('Log error:', e); }
+}
+
+function loadCoordLog(dateFrom, dateTo){
+  try {
+    const log = JSON.parse(localStorage.getItem(LOG_KEY)||'[]');
+    return log.filter(r => {
+      if(r.coordinator !== session.name) return false;
+      if(dateFrom && r.confirmed_at < dateFrom) return false;
+      if(dateTo   && r.confirmed_at > dateTo)   return false;
+      return true;
+    });
+  } catch(e){ return []; }
+}
 const headers = { 'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY };
 
 // ── UTILS ─────────────────────────────────────────────────
@@ -708,7 +782,9 @@ function updateStats(){
 async function confirmPay(num){
   const r=await updateTicket(num,{paid:true,paymentClaim:false});
   if(r.ok){
+    const e=DATA[num]||{};
     if(DATA[num]){DATA[num].paid=true;DATA[num].paymentClaim=false;}
+    logCoordAction('pago', num, TICKET, e.name, e.seller);
     toast('#'+num+' ✅ pago confirmado','ok');
     renderCurrent(); updateStats();
     setTimeout(()=>loadData(true),2000);
@@ -717,7 +793,9 @@ async function confirmPay(num){
 async function rejectPay(num){
   const r=await updateTicket(num,{paid:false,paymentClaim:false});
   if(r.ok){
+    const e=DATA[num]||{};
     if(DATA[num]){DATA[num].paid=false;DATA[num].paymentClaim=false;}
+    logCoordAction('pago_rechazado', num, 0, e.name, e.seller);
     toast('#'+num+' ✗ pago rechazado','err');
     renderCurrent(); updateStats();
     setTimeout(()=>loadData(true),2000);
@@ -728,13 +806,20 @@ async function confirmAbono(num){
   const nuevoAbono=(e.abonos||0)+(e.abonosPending||0);
   const paid=nuevoAbono>=TICKET;
   const r=await updateTicket(num,{abonos:nuevoAbono,abonosPending:0,paid,paymentClaim:paid?false:e.paymentClaim});
-  if(r.ok){ toast('#'+num+' 💰 abono confirmado','ok'); await loadData(true); }
-  else toast('Error','err');
+  if(r.ok){
+    logCoordAction('abono', num, e.abonosPending||0, e.name, e.seller);
+    toast('#'+num+' 💰 abono confirmado','ok');
+    await loadData(true);
+  } else toast('Error','err');
 }
 async function rejectAbono(num){
+  const e=DATA[num]||{};
   const r=await updateTicket(num,{abonosPending:0});
-  if(r.ok){ toast('#'+num+' abono rechazado',''); await loadData(true); }
-  else toast('Error','err');
+  if(r.ok){
+    logCoordAction('abono_rechazado', num, e.abonosPending||0, e.name, e.seller);
+    toast('#'+num+' abono rechazado','');
+    await loadData(true);
+  } else toast('Error','err');
 }
 
 // ── MODALS PENDIENTES ─────────────────────────────────────
@@ -1242,12 +1327,237 @@ function exportLibresPDF(){
   toast('Descargado — ábrelo e imprime como PDF','ok');
 }
 
+// ── REPORTE DE ACTIVIDAD ─────────────────────────────────
+let _reportData = [];
+
+function setReportToday(){
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('report-date-from').value = today;
+  document.getElementById('report-date-to').value   = today;
+  loadReportData();
+}
+
+async function openReportModal(){
+  setReportToday();
+  document.getElementById('report-modal').style.display='flex';
+}
+function closeReportModal(){ document.getElementById('report-modal').style.display='none'; }
+
+async function loadReportData(){
+  const fromVal = document.getElementById('report-date-from').value;
+  const toVal   = document.getElementById('report-date-to').value;
+  const list    = document.getElementById('report-modal-list');
+  list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text3)">Cargando…</div>';
+
+  const from = fromVal ? fromVal + 'T00:00:00.000Z' : null;
+  const to   = toVal   ? toVal   + 'T23:59:59.999Z' : null;
+  _reportData  = loadCoordLog(from, to);
+
+  if(!_reportData.length){
+    list.innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3)">Sin actividad en este período</div>';
+    return;
+  }
+
+  // Agrupar por tipo
+  const pagos    = _reportData.filter(r=>r.accion==='pago');
+  const abonos   = _reportData.filter(r=>r.accion==='abono');
+  const rechPago = _reportData.filter(r=>r.accion==='pago_rechazado');
+  const rechAbon = _reportData.filter(r=>r.accion==='abono_rechazado');
+  const totalPagos  = pagos.length * TICKET;
+  const totalAbonos = abonos.reduce((s,r)=>s+(r.monto||0),0);
+  const totalGlobal = totalPagos + totalAbonos;
+
+  const fmtDT = iso => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('es',{day:'2-digit',month:'2-digit',year:'2-digit'})
+      + ' ' + d.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  };
+
+  const renderRows = (items, color) => items.map(r=>`
+    <div style="display:grid;grid-template-columns:auto 1fr 1fr auto auto;gap:.5rem;align-items:center;
+      padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:.8rem">
+      <span style="font-family:'Space Mono',monospace;font-weight:700;color:var(--gold)">#${r.numero}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.buyer||'')}</span>
+      <span style="color:var(--text3);font-size:.74rem">${esc(r.seller||'')}</span>
+      <span style="font-family:'Space Mono',monospace;color:${color};font-weight:700">${r.monto>0?'+'+fmt(r.monto):TICKET>0?'+'+fmt(TICKET):''}</span>
+      <span style="color:var(--text3);font-size:.72rem;white-space:nowrap">${fmtDT(r.confirmed_at)}</span>
+    </div>`).join('');
+
+  list.innerHTML = `
+    <!-- RESUMEN -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1rem">
+      <div style="font-family:'Syne',sans-serif;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:.6rem">Resumen del período</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;text-align:center">
+        <div style="background:var(--surface3);border-radius:8px;padding:.6rem">
+          <div style="font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--green)">${pagos.length}</div>
+          <div style="font-size:.72rem;color:var(--text3);margin-top:2px">Pagos confirmados</div>
+        </div>
+        <div style="background:var(--surface3);border-radius:8px;padding:.6rem">
+          <div style="font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--green)">${abonos.length}</div>
+          <div style="font-size:.72rem;color:var(--text3);margin-top:2px">Abonos confirmados</div>
+        </div>
+        <div style="background:var(--surface3);border-radius:8px;padding:.6rem">
+          <div style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--gold)">${fmt(totalGlobal)}</div>
+          <div style="font-size:.72rem;color:var(--text3);margin-top:2px">Total confirmado</div>
+        </div>
+      </div>
+      ${rechPago.length||rechAbon.length?`<div style="margin-top:.6rem;font-size:.75rem;color:var(--red)">⚠️ Rechazados: ${rechPago.length} pagos · ${rechAbon.length} abonos</div>`:''}
+    </div>
+
+    ${pagos.length?`
+    <!-- PAGOS CONFIRMADOS -->
+    <div style="font-family:'Syne',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--green);margin-bottom:.4rem">
+      ✅ Pagos confirmados (${pagos.length}) — Total: ${fmt(totalPagos)}
+    </div>
+    <div style="margin-bottom:1rem">${renderRows(pagos,'var(--green)')}</div>`:''}
+
+    ${abonos.length?`
+    <!-- ABONOS CONFIRMADOS -->
+    <div style="font-family:'Syne',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#40c870;margin-bottom:.4rem">
+      💰 Abonos confirmados (${abonos.length}) — Total: ${fmt(totalAbonos)}
+    </div>
+    <div style="margin-bottom:1rem">${renderRows(abonos,'#40c870')}</div>`:''}
+
+    ${rechPago.length||rechAbon.length?`
+    <!-- RECHAZADOS -->
+    <div style="font-family:'Syne',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--red);margin-bottom:.4rem">
+      ✗ Rechazados (${rechPago.length+rechAbon.length})
+    </div>
+    <div>${renderRows([...rechPago,...rechAbon],'var(--red)')}</div>`:''}
+  `;
+}
+
+function exportReportCSV(){
+  if(!_reportData.length){ toast('Sin datos para exportar','err'); return; }
+  const rows=[['Fecha/Hora','Coordinador','Número','Comprador','Colaborador','Acción','Monto']];
+  _reportData.forEach(r=>{
+    const fmtDT = iso => new Date(iso).toLocaleString('es');
+    const accionLabel = r.accion==='pago'?'Pago confirmado':r.accion==='abono'?'Abono confirmado':
+      r.accion==='pago_rechazado'?'Pago rechazado':'Abono rechazado';
+    rows.push([fmtDT(r.confirmed_at),r.coordinator,'#'+r.numero,r.buyer||'',r.seller||'',accionLabel,r.monto||TICKET]);
+  });
+  const csv=rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const fromVal=document.getElementById('report-date-from').value;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`actividad-${(session.name||'coord').toLowerCase().replace(/\s+/g,'-')}-${fromVal}.csv`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  toast('CSV descargado','ok');
+}
+
+function clearCoordLog(){
+  if(!confirm('¿Borrar todo el historial de actividad? Esta acción no se puede deshacer.')) return;
+  localStorage.removeItem(LOG_KEY);
+  _reportData=[];
+  document.getElementById('report-modal-list').innerHTML=
+    '<div style="text-align:center;padding:2rem;color:var(--text3)">Historial borrado</div>';
+  toast('Historial borrado','');
+}
+
+function exportReportPDF(){
+  if(!_reportData.length){ toast('Sin datos para exportar','err'); return; }
+  const fromVal = document.getElementById('report-date-from').value;
+  const toVal   = document.getElementById('report-date-to').value;
+  const pagos   = _reportData.filter(r=>r.accion==='pago');
+  const abonos  = _reportData.filter(r=>r.accion==='abono');
+  const rechPago= _reportData.filter(r=>r.accion==='pago_rechazado');
+  const rechAbon= _reportData.filter(r=>r.accion==='abono_rechazado');
+  const totalPagos  = pagos.length * TICKET;
+  const totalAbonos = abonos.reduce((s,r)=>s+(r.monto||0),0);
+  const totalGlobal = totalPagos + totalAbonos;
+  const now = new Date().toLocaleString('es');
+
+  const fmtDT = iso => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('es',{day:'2-digit',month:'2-digit',year:'numeric'})
+      + ' ' + d.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  };
+  const periodo = fromVal===toVal ? fromVal : `${fromVal} al ${toVal}`;
+
+  const tableRows = (items) => items.map(r=>`
+    <tr>
+      <td style="font-weight:800;font-family:monospace">#${r.numero}</td>
+      <td>${r.buyer||''}</td>
+      <td>${r.seller||''}</td>
+      <td style="text-align:right;font-weight:700">${fmt(r.monto||TICKET)}</td>
+      <td style="font-size:.8rem;color:#555">${fmtDT(r.confirmed_at)}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Reporte ${session.name} — ${periodo}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:Arial,sans-serif;padding:15mm;font-size:12px;color:#111}
+      h1{font-size:18px;margin-bottom:4px}
+      .sub{color:#555;font-size:11px;margin-bottom:16px}
+      .stats{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+      .stat{background:#f5f5f5;padding:8px 16px;border-radius:6px;text-align:center;min-width:100px}
+      .stat b{display:block;font-size:18px;color:#1a3a7a}
+      .stat.total b{color:#c8960a;font-size:20px}
+      h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#333;
+        margin:16px 0 6px;padding-bottom:4px;border-bottom:2px solid #ddd}
+      table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px}
+      th{background:#1a1a2a;color:#fff;padding:5px 8px;text-align:left}
+      td{padding:5px 8px;border-bottom:1px solid #eee}
+      tr:nth-child(even) td{background:#f9f9f9}
+      .total-row td{font-weight:700;background:#e8f5e9 !important;border-top:2px solid #1a7a3a}
+      .footer{margin-top:20px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#888;text-align:center}
+      @media print{body{padding:8mm}}
+    </style></head><body>
+    <h1>El Milagro — Reporte de Actividad</h1>
+    <div class="sub">Coordinador: <strong>${session.name}</strong> &nbsp;·&nbsp; Período: <strong>${periodo}</strong> &nbsp;·&nbsp; Generado: ${now}</div>
+
+    <div class="stats">
+      <div class="stat"><b>${pagos.length}</b>Pagos confirmados</div>
+      <div class="stat"><b>${abonos.length}</b>Abonos confirmados</div>
+      ${rechPago.length||rechAbon.length?`<div class="stat"><b style="color:#c03020">${rechPago.length+rechAbon.length}</b>Rechazados</div>`:''}
+      <div class="stat total"><b>${fmt(totalGlobal)}</b>Total confirmado</div>
+    </div>
+
+    ${pagos.length?`
+    <h2>✅ Pagos confirmados (${pagos.length}) — Total: ${fmt(totalPagos)}</h2>
+    <table><thead><tr><th>#</th><th>Comprador</th><th>Colaborador</th><th>Monto</th><th>Fecha y hora</th></tr></thead>
+    <tbody>${tableRows(pagos)}
+    <tr class="total-row"><td colspan="3"><strong>TOTAL PAGOS</strong></td><td><strong>${fmt(totalPagos)}</strong></td><td></td></tr>
+    </tbody></table>`:''}
+
+    ${abonos.length?`
+    <h2>💰 Abonos confirmados (${abonos.length}) — Total: ${fmt(totalAbonos)}</h2>
+    <table><thead><tr><th>#</th><th>Comprador</th><th>Colaborador</th><th>Abono</th><th>Fecha y hora</th></tr></thead>
+    <tbody>${tableRows(abonos)}
+    <tr class="total-row"><td colspan="3"><strong>TOTAL ABONOS</strong></td><td><strong>${fmt(totalAbonos)}</strong></td><td></td></tr>
+    </tbody></table>`:''}
+
+    ${rechPago.length||rechAbon.length?`
+    <h2>✗ Rechazados (${rechPago.length+rechAbon.length})</h2>
+    <table><thead><tr><th>#</th><th>Comprador</th><th>Colaborador</th><th>Tipo</th><th>Fecha y hora</th></tr></thead>
+    <tbody>${[...rechPago,...rechAbon].map(r=>`<tr>
+      <td style="font-weight:800;font-family:monospace">#${r.numero}</td>
+      <td>${r.buyer||''}</td><td>${r.seller||''}</td>
+      <td>${r.accion==='pago_rechazado'?'Pago':'Abono'}</td>
+      <td style="font-size:.8rem;color:#555">${fmtDT(r.confirmed_at)}</td>
+    </tr>`).join('')}</tbody></table>`:''}
+
+    <div class="footer">El Milagro · Reporte generado por ${session.name} · ${now}</div>
+    </body></html>`;
+
+  const blob = new Blob([html],{type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `reporte-${session.name.toLowerCase().replace(/\s+/g,'-')}-${fromVal}.html`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  toast('Reporte descargado','ok');
+}
+
 // ── KEYBOARD ──────────────────────────────────────────────
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     closeD();
     closePendingModal();
     closeAbonosModal();
+    closeReportModal();
   }
 });
 
